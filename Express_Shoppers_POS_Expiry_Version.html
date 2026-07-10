@@ -1,0 +1,2632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Express Shoppers POS & Inventory — Mbarara, Uganda</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            primary: { 50: '#eef2ff', 100: '#e0e7ff', 200: '#c7d2fe', 300: '#a5b4fc', 400: '#818cf8', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca', 800: '#3730a3', 900: '#312e81' },
+            success: { 50: '#f0fdf4', 100: '#dcfce7', 200: '#bbf7d0', 300: '#86efac', 400: '#4ade80', 500: '#22c55e', 600: '#16a34a', 700: '#15803d', 800: '#166534', 900: '#14532d' },
+            warning: { 50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d', 400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 800: '#92400e', 900: '#78350f' },
+            danger:  { 50: '#fef2f2', 100: '#fee2e2', 200: '#fecaca', 300: '#fca5a5', 400: '#f87171', 500: '#ef4444', 600: '#dc2626', 700: '#b91c1c', 800: '#991b1b', 900: '#7f1d1d' },
+            surface: { 50: '#f8fafc', 100: '#f1f5f9', 200: '#e2e8f0', 300: '#cbd5e1', 400: '#94a3b8', 500: '#64748b', 600: '#475569', 700: '#334155', 800: '#1e293b', 900: '#0f172a' },
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+          },
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { scrollbar-width: thin; scrollbar-color: #cbd5e1 transparent; }
+    *::-webkit-scrollbar { width: 6px; height: 6px; }
+    *::-webkit-scrollbar-track { background: transparent; }
+    *::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    *::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    .glass { background: rgba(255,255,255,0.75); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+    .card-hover { transition: all 0.25s cubic-bezier(0.4,0,0.2,1); }
+    .card-hover:hover { transform: translateY(-2px); box-shadow: 0 12px 40px -12px rgba(0,0,0,0.12), 0 4px 12px -4px rgba(0,0,0,0.06); }
+    .btn-press { transition: transform 0.1s, box-shadow 0.2s; }
+    .btn-press:active { transform: scale(0.96); }
+    .fade-in { animation: fadeIn 0.3s ease-out; }
+    .slide-up { animation: slideUp 0.3s ease-out; }
+    .shake { animation: shake 0.4s ease-in-out; }
+    .bounce-in { animation: bounceIn 0.4s cubic-bezier(0.34,1.56,0.64,1); }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+    @keyframes bounceIn { from { opacity:0; transform:scale(0.85); } to { opacity:1; transform:scale(1); } }
+    @keyframes toastSlide { from { opacity:0; transform:translateX(40px); } to { opacity:1; transform:translateX(0); } }
+    @keyframes pulse-ring { 0%{box-shadow:0 0 0 0 rgba(99,102,241,0.4)} 70%{box-shadow:0 0 0 8px rgba(99,102,241,0)} 100%{box-shadow:0 0 0 0 rgba(99,102,241,0)} }
+    @keyframes cart-bump { 0%{transform:scale(1)} 40%{transform:scale(1.15)} 100%{transform:scale(1)} }
+    .toast-enter { animation: toastSlide 0.35s ease-out forwards; }
+    .cart-bump { animation: cart-bump 0.3s ease-out; }
+    .pulse-ring { animation: pulse-ring 1.5s infinite; }
+
+    .nav-active { position: relative; background: rgba(255,255,255,0.15); }
+    .nav-active::after { content:''; position:absolute; bottom:-2px; left:25%; width:50%; height:2px; background:#fff; border-radius:2px; }
+
+    .stock-bar { transition: width 0.5s ease-out; }
+    .tab-content { transition: opacity 0.2s ease-out; }
+
+    .receipt-paper { background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+
+    @media print {
+      body * { visibility: hidden; }
+      #receipt-print-area, #receipt-print-area * { visibility: visible; }
+      #receipt-print-area { position: absolute; left: 0; top: 0; width: 100%; margin: 0; padding: 0; }
+      .no-print { display: none !important; }
+    }
+
+    .chart-bar { transition: height 0.6s cubic-bezier(0.4,0,0.2,1); }
+    .number-pad-btn { user-select: none; }
+    .user-card { transition: all 0.2s ease; }
+    .user-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px -4px rgba(0,0,0,0.1); }
+    .user-card.selected { ring: 2px; ring-color: #6366f1; background: #eef2ff; border-color: #6366f1; }
+    .activity-row { transition: background 0.15s; }
+    .activity-row:hover { background: #f8fafc; }
+  </style>
+</head>
+<body class="bg-surface-100 font-sans text-gray-800 antialiased min-h-screen">
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed top-4 right-4 z-[60] flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Login Overlay -->
+  <div id="login-overlay" class="fixed inset-0 z-[70] bg-primary-900 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 slide-up text-center">
+      <div class="w-16 h-16 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+      </div>
+      <h2 class="text-2xl font-bold text-gray-900 mb-1">Express Shoppers</h2>
+      <p class="text-sm text-gray-500 mb-6">Mbarara, Uganda — POS System</p>
+
+      <div id="login-step-select" class="space-y-4">
+        <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Select User</p>
+        <div id="login-user-grid" class="grid grid-cols-2 gap-3"></div>
+        <div class="pt-2">
+          <button onclick="showPinEntry()" id="btn-continue-login" disabled class="w-full bg-gray-300 text-white font-bold py-3 rounded-xl transition btn-press cursor-not-allowed">Continue</button>
+        </div>
+        <p class="text-xs text-gray-400 mt-2">Up to 4 users can be configured in Settings</p>
+      </div>
+
+      <div id="login-step-pin" class="hidden space-y-3">
+        <div class="flex items-center justify-center gap-2 mb-2">
+          <div id="login-selected-avatar" class="w-8 h-8 rounded-full bg-primary-500 text-white flex items-center justify-center text-sm font-bold"></div>
+          <span id="login-selected-name" class="text-sm font-semibold text-gray-700"></span>
+        </div>
+        <input type="password" id="login-pin" placeholder="Enter PIN" maxlength="6" class="w-full px-4 py-3 text-center text-lg tracking-widest border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 font-mono" onkeydown="if(event.key==='Enter')doLogin()">
+        <button onclick="doLogin()" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-xl transition btn-press shadow-lg shadow-primary-500/25">Unlock System</button>
+        <button onclick="backToUserSelect()" class="w-full text-xs text-gray-400 hover:text-gray-600 py-1">Back to user selection</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="bg-primary-700 text-white shadow-lg no-print sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6">
+      <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center py-2.5 sm:py-0 sm:h-16 gap-2.5 sm:gap-2">
+
+        <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+          <div class="w-8 h-8 sm:w-9 sm:h-9 bg-white/15 rounded-lg flex items-center justify-center backdrop-blur">
+            <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+          </div>
+          <div>
+            <h1 class="text-sm sm:text-lg font-bold tracking-tight leading-tight">Express Shoppers</h1>
+            <p class="text-[9px] sm:text-[10px] text-primary-100 font-medium -mt-0.5">Mbarara, Uganda</p>
+          </div>
+        </div>
+
+        <div class="flex items-center gap-1 bg-primary-800/50 rounded-xl p-1 overflow-x-auto w-full sm:w-auto sm:flex-1 sm:max-w-none [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+
+          <button onclick="switchTab('dashboard-tab')" id="btn-dashboard-tab" class="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition flex items-center gap-1.5 btn-press whitespace-nowrap">
+            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+            <span>Dashboard</span>
+          </button>
+
+          <button onclick="switchTab('pos-tab')" id="btn-pos-tab" class="nav-active px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm transition flex items-center gap-1.5 btn-press whitespace-nowrap">
+            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+            <span>Cashier</span>
+          </button>
+
+          <button onclick="switchTab('inventory-tab')" id="btn-inventory-tab" class="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm hover:bg-white/10 transition flex items-center gap-1.5 btn-press whitespace-nowrap">
+            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            <span>Inventory</span>
+          </button>
+
+          <button onclick="switchTab('history-tab')" id="btn-history-tab" class="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm hover:bg-white/10 transition flex items-center gap-1.5 btn-press whitespace-nowrap">
+            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span>History</span>
+          </button>
+
+          <button onclick="switchTab('activity-tab')" id="btn-activity-tab" class="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm hover:bg-white/10 transition flex items-center gap-1.5 btn-press whitespace-nowrap">
+            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+            <span>Activity</span>
+          </button>
+
+          <button onclick="switchTab('settings-tab')" id="btn-settings-tab" class="px-2.5 py-1.5 sm:px-4 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm hover:bg-white/10 transition flex items-center gap-1.5 btn-press whitespace-nowrap">
+            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            <span>Settings</span>
+          </button>
+
+          <button onclick="doLogout()" class="sm:hidden px-2.5 py-1.5 rounded-lg font-semibold text-xs text-red-200 hover:bg-red-600/20 transition flex items-center gap-1.5 btn-press whitespace-nowrap">
+            <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+            <span>Logout</span>
+          </button>
+        </div>
+
+        <div class="hidden sm:flex items-center gap-3 ml-1 flex-shrink-0">
+          <div id="current-user-badge" class="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-lg">
+            <div id="nav-user-avatar" class="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs font-bold"></div>
+            <span id="nav-user-name" class="text-xs font-semibold"></span>
+          </div>
+          <button onclick="doLogout()" class="flex items-center gap-1.5 text-xs font-semibold text-primary-100 hover:text-white transition btn-press">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+            Logout
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </nav>
+
+  <!-- Confirm Modal -->
+  <div id="confirm-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50 no-print">
+    <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl slide-up">
+      <div class="w-12 h-12 bg-danger-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-6 h-6 text-danger-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+      </div>
+      <h3 class="text-lg font-bold text-center text-gray-900 mb-1" id="confirm-title">Confirm Action</h3>
+      <p class="text-sm text-gray-500 text-center mb-6" id="confirm-message">Are you sure?</p>
+      <div class="flex gap-3">
+        <button onclick="closeConfirmModal()" class="flex-1 border border-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl hover:bg-gray-50 transition btn-press">Cancel</button>
+        <button id="confirm-action-btn" class="flex-1 bg-danger-600 hover:bg-danger-700 text-white font-semibold py-2.5 rounded-xl transition btn-press shadow-lg shadow-danger-500/25">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit Product Modal -->
+  <div id="edit-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50 no-print">
+    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl slide-up">
+      <h3 class="text-lg font-bold text-gray-900 mb-4">Edit Product</h3>
+      <form id="edit-product-form" onsubmit="handleEditProduct(event)" class="space-y-4">
+        <input type="hidden" id="edit-original-id">
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Product ID</label>
+          <input type="text" id="edit-id" required class="px-3 py-2.5 text-sm w-full border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-surface-50 font-mono">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Product Name</label>
+          <input type="text" id="edit-name" required class="px-3 py-2.5 text-sm w-full border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-surface-50">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Price (UGX)</label>
+            <input type="number" id="edit-price" required min="0" class="px-3 py-2.5 text-sm w-full border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-surface-50">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Stock Qty</label>
+            <input type="number" id="edit-stock" required min="0" class="px-3 py-2.5 text-sm w-full border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-surface-50">
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Category</label>
+          <select id="edit-category" class="px-3 py-2.5 text-sm w-full border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-surface-50">
+            <option value="General">General</option>
+            <option value="Food">Food & Groceries</option>
+            <option value="Beverages">Beverages</option>
+            <option value="Household">Household</option>
+            <option value="Personal Care">Personal Care</option>
+            <option value="Electronics">Electronics</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Expiry Date</label>
+            <input type="date" id="edit-expiry" class="px-3 py-2.5 text-sm w-full border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-surface-50">
+          </div>
+          <div class="flex flex-col justify-center">
+            <label class="flex items-center gap-2 text-xs font-semibold text-gray-600 mt-6 cursor-pointer">
+              <input type="checkbox" id="edit-perishable" class="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+              Perishable
+            </label>
+          </div>
+        </div>
+        <div class="flex gap-3 pt-2">
+          <button type="button" onclick="closeEditModal()" class="flex-1 border border-gray-200 text-gray-700 font-semibold py-2.5 rounded-xl hover:bg-gray-50 transition btn-press">Cancel</button>
+          <button type="submit" class="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-semibold py-2.5 rounded-xl transition btn-press shadow-lg shadow-primary-500/25">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 py-6 no-print">
+
+    <!-- DASHBOARD TAB -->
+    <section id="dashboard-tab" class="hidden tab-content space-y-6">
+      <!-- KPI Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-surface-200 card-hover">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Today's Sales</span>
+            <div class="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+          </div>
+          <div class="text-2xl font-extrabold text-gray-900" id="dash-today-sales">0 UGX</div>
+          <div class="text-xs text-gray-400 mt-1"><span id="dash-today-count">0</span> transactions</div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-surface-200 card-hover">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Inventory Value</span>
+            <div class="w-8 h-8 bg-success-100 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>
+            </div>
+          </div>
+          <div class="text-2xl font-extrabold text-gray-900" id="dash-inventory-value">0 UGX</div>
+          <div class="text-xs text-gray-400 mt-1"><span id="dash-total-products">0</span> products</div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-surface-200 card-hover">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Low Stock Alerts</span>
+            <div class="w-8 h-8 bg-warning-100 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-warning-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+            </div>
+          </div>
+          <div class="text-2xl font-extrabold text-warning-600" id="dash-low-stock">0</div>
+          <div class="text-xs text-gray-400 mt-1">Items need restocking</div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-surface-200 card-hover">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Out of Stock</span>
+            <div class="w-8 h-8 bg-danger-100 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-danger-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+            </div>
+          </div>
+          <div class="text-2xl font-extrabold text-danger-600" id="dash-out-stock">0</div>
+          <div class="text-xs text-gray-400 mt-1">Items unavailable</div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-danger-200 card-hover ring-1 ring-danger-100">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-semibold text-danger-600 uppercase tracking-wider">Expired</span>
+            <div class="w-8 h-8 bg-danger-100 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-danger-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+          </div>
+          <div class="text-2xl font-extrabold text-danger-700" id="dash-expired-count">0</div>
+          <div class="text-xs text-danger-400 mt-1">Blocked from sale</div>
+        </div>
+        <div class="bg-white rounded-2xl p-5 shadow-sm border border-warning-200 card-hover ring-1 ring-warning-100">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-semibold text-warning-600 uppercase tracking-wider">Expiring Soon</span>
+            <div class="w-8 h-8 bg-warning-100 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-warning-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+          </div>
+          <div class="text-2xl font-extrabold text-warning-600" id="dash-expiring-count">0</div>
+          <div class="text-xs text-gray-400 mt-1">Next 7 days</div>
+        </div>
+      </div>
+
+      <!-- Expiry Alerts Panel -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white rounded-2xl shadow-sm border border-surface-200 overflow-hidden">
+          <div class="p-5 border-b border-surface-100 flex justify-between items-center">
+            <h3 class="text-sm font-bold text-gray-800 flex items-center gap-2">
+              <svg class="w-4 h-4 text-danger-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+              Expiry Alerts
+            </h3>
+            <div class="flex gap-2">
+              <button onclick="filterExpiry('expired')" class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-danger-100 text-danger-700 hover:bg-danger-200 transition">Expired</button>
+              <button onclick="filterExpiry('soon')" class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-warning-100 text-warning-700 hover:bg-warning-200 transition">Soon</button>
+              <button onclick="filterExpiry('all')" class="text-[10px] font-bold px-2.5 py-1 rounded-full bg-surface-100 text-gray-600 hover:bg-surface-200 transition">All</button>
+            </div>
+          </div>
+          <div id="dash-expiry-alerts" class="divide-y divide-surface-100 max-h-[280px] overflow-y-auto"></div>
+        </div>
+        <div class="bg-white rounded-2xl shadow-sm border border-surface-200 p-5">
+          <h3 class="text-sm font-bold text-gray-800 mb-4">Waste Prevention</h3>
+          <div class="grid grid-cols-3 gap-3 text-center">
+            <div class="p-3 bg-danger-50 rounded-xl border border-danger-100">
+              <div class="text-lg font-extrabold text-danger-700" id="waste-expired-value">0 UGX</div>
+              <div class="text-[10px] text-danger-500 font-semibold uppercase mt-1">Expired Value</div>
+            </div>
+            <div class="p-3 bg-warning-50 rounded-xl border border-warning-100">
+              <div class="text-lg font-extrabold text-warning-700" id="waste-risk-value">0 UGX</div>
+              <div class="text-[10px] text-warning-600 font-semibold uppercase mt-1">At Risk (7d)</div>
+            </div>
+            <div class="p-3 bg-success-50 rounded-xl border border-success-100">
+              <div class="text-lg font-extrabold text-success-700" id="waste-safe-count">0</div>
+              <div class="text-[10px] text-success-600 font-semibold uppercase mt-1">Safe Items</div>
+            </div>
+          </div>
+          <div class="mt-4 p-3 bg-surface-50 rounded-xl text-xs text-gray-600 leading-relaxed">
+            <strong>Tip:</strong> Enable FEFO selling. Items expiring soonest are blocked from overstocking. Use Discount for items expiring in &lt; 3 days to reduce waste.
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Top Products -->
+        <div class="bg-white rounded-2xl shadow-sm border border-surface-200 p-5">
+          <h3 class="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+            Top Selling Products
+          </h3>
+          <div id="dash-top-products" class="space-y-3"></div>
+        </div>
+
+        <!-- Recent Activity -->
+        <div class="bg-white rounded-2xl shadow-sm border border-surface-200 p-5 lg:col-span-2">
+          <h3 class="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
+            <svg class="w-4 h-4 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Recent Transactions
+          </h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead>
+                <tr class="text-xs font-semibold text-gray-400 uppercase tracking-wider border-b border-surface-200">
+                  <th class="pb-2">Receipt</th>
+                  <th class="pb-2">Time</th>
+                  <th class="pb-2">User</th>
+                  <th class="pb-2 text-right">Items</th>
+                  <th class="pb-2 text-right">Total</th>
+                  <th class="pb-2 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody id="dash-recent-sales" class="divide-y divide-surface-100"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Category Breakdown -->
+      <div class="bg-white rounded-2xl shadow-sm border border-surface-200 p-5">
+        <h3 class="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
+          <svg class="w-4 h-4 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z"/></svg>
+          Inventory by Category
+        </h3>
+        <div id="dash-category-chart" class="flex items-end gap-3 h-32"></div>
+      </div>
+    </section>
+
+    <!-- POS TAB -->
+    <section id="pos-tab" class="tab-content grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Product Catalog -->
+      <div class="lg:col-span-2 space-y-4">
+        <!-- Search & Filters Bar -->
+        <div class="bg-white rounded-2xl shadow-sm border border-surface-200 p-4">
+          <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+            <div>
+              <h2 class="text-base font-bold text-gray-800">Product Catalog</h2>
+              <p class="text-xs text-gray-400 mt-0.5"><span id="catalog-count">0</span> products available</p>
+            </div>
+            <div class="flex items-center gap-3 w-full sm:w-auto">
+              <div class="relative flex-1 sm:flex-initial">
+                <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" id="pos-search" oninput="renderPosProducts()" placeholder="Search products..." class="pl-9 pr-4 py-2.5 text-sm border border-surface-200 rounded-xl w-full sm:w-56 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition bg-surface-50">
+              </div>
+              <div class="relative flex-1 sm:flex-initial">
+                <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+                <input type="text" id="barcode-input" onkeydown="handleBarcodeScan(event)" placeholder="Scan barcode..." class="pl-9 pr-4 py-2.5 text-sm border border-surface-200 rounded-xl w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition bg-surface-50 font-mono">
+              </div>
+            </div>
+          </div>
+          <!-- Category Pills -->
+          <div class="flex gap-2 mt-3 overflow-x-auto pb-1" id="category-pills">
+            <button onclick="filterCategory('all')" id="cat-all" class="cat-pill active px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-primary-600 text-white transition whitespace-nowrap btn-press">All Products</button>
+          </div>
+        </div>
+
+        <!-- Products Grid -->
+        <div id="pos-products-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+      </div>
+
+      <!-- Cart Sidebar -->
+      <div class="bg-white rounded-2xl shadow-sm border border-surface-200 flex flex-col h-fit sticky top-20">
+        <!-- Cart Header -->
+        <div class="p-5 border-b border-surface-100">
+          <div class="flex justify-between items-center">
+            <div class="flex items-center gap-2">
+              <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"/></svg>
+              <h2 class="text-base font-bold text-gray-800">Current Order</h2>
+            </div>
+            <span id="cart-count" class="bg-primary-100 text-primary-700 text-xs font-bold px-2.5 py-1 rounded-full">0 items</span>
+          </div>
+          <!-- Customer Info -->
+          <div class="mt-3 flex gap-2">
+            <input type="text" id="cart-customer-name" placeholder="Customer name (optional)" class="flex-1 px-3 py-2 text-xs border border-surface-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-surface-50">
+            <input type="tel" id="cart-customer-phone" placeholder="Phone" class="w-28 px-3 py-2 text-xs border border-surface-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 bg-surface-50">
+          </div>
+        </div>
+
+        <!-- Cart Items -->
+        <div id="cart-items-container" class="flex-1 p-4 space-y-3 max-h-[380px] overflow-y-auto min-h-[180px]">
+          <div class="flex flex-col items-center justify-center h-full text-center py-10">
+            <div class="w-16 h-16 bg-surface-100 rounded-2xl flex items-center justify-center mb-3">
+              <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            </div>
+            <p class="text-sm text-gray-400 font-medium">Your cart is empty</p>
+            <p class="text-xs text-gray-300 mt-1">Add products or scan barcode</p>
+          </div>
+        </div>
+
+        <!-- Cart Footer -->
+        <div class="border-t border-surface-100 p-5 space-y-4">
+          <!-- Discount -->
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-gray-500">Discount:</span>
+            <input type="number" id="cart-discount" min="0" value="0" onchange="renderCart()" class="w-24 px-2 py-1.5 text-xs border border-surface-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/30 bg-surface-50 text-right">
+            <span class="text-xs text-gray-400">UGX</span>
+          </div>
+          <!-- Payment Method -->
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-gray-500">Payment:</span>
+            <select id="cart-payment" class="flex-1 px-2 py-1.5 text-xs border border-surface-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500/30 bg-surface-50">
+              <option value="Cash">Cash</option>
+              <option value="Mobile Money">Mobile Money</option>
+              <option value="Card">Card / Bank</option>
+              <option value="Credit">Credit / IOU</option>
+            </select>
+          </div>
+          <!-- Totals -->
+          <div class="flex justify-between items-center px-1">
+            <div>
+              <span class="text-sm text-gray-500">Total Amount</span>
+              <div class="text-xs text-gray-400" id="cart-item-summary">0 item(s)</div>
+            </div>
+            <span class="text-2xl font-extrabold text-primary-600" id="cart-grand-total">0 <span class="text-sm font-semibold">UGX</span></span>
+          </div>
+          <button onclick="processCheckout()" class="w-full bg-success-600 hover:bg-success-700 text-white font-bold py-3.5 rounded-xl transition btn-press shadow-lg shadow-success-500/25 flex items-center justify-center gap-2 group">
+            <svg class="w-5 h-5 transition group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            Complete Sale
+          </button>
+          <button onclick="clearCart()" id="clear-cart-btn" class="w-full hidden border border-gray-200 text-gray-500 hover:text-danger-600 hover:border-danger-200 hover:bg-danger-50 font-semibold py-2.5 rounded-xl transition btn-press text-sm flex items-center justify-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            Clear Cart
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- INVENTORY TAB -->
+    <section id="inventory-tab" class="hidden tab-content grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Add Product Form -->
+      <div class="bg-white rounded-2xl shadow-sm border border-surface-200 h-fit">
+        <div class="p-5 border-b border-surface-100">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+            </div>
+            <h2 class="text-base font-bold text-gray-800">Add New Product</h2>
+          </div>
+        </div>
+
+        <div class="p-5">
+          <form id="add-product-form" onsubmit="handleNewProduct(event)" class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Product ID / Barcode</label>
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-mono text-xs">#</span>
+                <input type="text" id="form-id" required placeholder="e.g., UG-SUG-01" class="pl-7 pr-3 py-2.5 text-sm w-full border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition bg-surface-50 font-mono">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Product Name</label>
+              <input type="text" id="form-name" required placeholder="e.g., Kakira Sugar 1kg" class="px-3 py-2.5 text-sm w-full border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition bg-surface-50">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Price (UGX)</label>
+                <input type="number" id="form-price" required min="0" placeholder="5000" class="px-3 py-2.5 text-sm w-full border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition bg-surface-50">
+              </div>
+              <div>
+                <label class="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Stock Qty</label>
+                <input type="number" id="form-stock" required min="0" placeholder="50" class="px-3 py-2.5 text-sm w-full border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition bg-surface-50">
+              </div>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Category</label>
+              <select id="form-category" onchange="togglePerishableDefault(this.value)" class="px-3 py-2.5 text-sm w-full border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition bg-surface-50">
+                <option value="General">General</option>
+                <option value="Food">Food & Groceries</option>
+                <option value="Beverages">Beverages</option>
+                <option value="Household">Household</option>
+                <option value="Personal Care">Personal Care</option>
+                <option value="Electronics">Electronics</option>
+              </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-semibold text-gray-600 mb-1.5 uppercase tracking-wider">Expiry Date</label>
+                <input type="date" id="form-expiry" class="px-3 py-2.5 text-sm w-full border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition bg-surface-50">
+                <p class="text-[10px] text-gray-400 mt-1">Leave blank if non-perishable</p>
+              </div>
+              <div class="flex flex-col justify-center">
+                <label class="flex items-center gap-2 text-xs font-semibold text-gray-600 mt-6 cursor-pointer select-none">
+                  <input type="checkbox" id="form-perishable" checked class="w-4 h-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500">
+                  Perishable item
+                </label>
+              </div>
+            </div>
+            <button type="submit" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-xl transition btn-press shadow-lg shadow-primary-500/25 flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+              Save Product
+            </button>
+          </form>
+        </div>
+
+        <div class="p-5 border-t border-surface-100 bg-surface-50/50 rounded-b-2xl space-y-3">
+          <button onclick="exportInventoryCSV()" class="w-full bg-white border border-surface-200 hover:bg-surface-50 text-gray-700 font-semibold py-2.5 rounded-xl text-sm transition btn-press flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+            Export Inventory CSV
+          </button>
+          <button onclick="showResetConfirm()" class="w-full bg-white border border-danger-200 hover:bg-danger-50 text-danger-600 font-semibold py-2.5 rounded-xl text-sm transition btn-press flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            Reset All Data
+          </button>
+        </div>
+      </div>
+
+      <!-- Inventory Table -->
+      <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-surface-200 overflow-hidden">
+        <div class="p-5 border-b border-surface-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 bg-success-100 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-success-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+            </div>
+            <div>
+              <h2 class="text-base font-bold text-gray-800">Master Inventory</h2>
+              <p class="text-xs text-gray-400" id="inventory-count">0 products</p>
+            </div>
+          </div>
+          <div class="relative w-full sm:w-auto">
+            <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            <input type="text" id="inventory-search" oninput="renderInventoryTable()" placeholder="Search inventory..." class="pl-9 pr-4 py-2 text-sm border border-surface-200 rounded-xl w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition bg-surface-50">
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="bg-surface-50 border-b border-surface-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th class="px-5 py-3">Product</th>
+                <th class="px-5 py-3 text-right">Price</th>
+                <th class="px-5 py-3 text-center">Stock</th>
+                <th class="px-5 py-3 text-center">Expiry</th>
+                <th class="px-5 py-3 text-center">Status</th>
+                <th class="px-5 py-3 text-right">Value</th>
+                <th class="px-5 py-3 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="inventory-table-body" class="divide-y divide-surface-100"></tbody>
+          </table>
+        </div>
+
+        <!-- Inventory Summary Footer -->
+        <div class="p-4 bg-surface-50 border-t border-surface-100 flex flex-wrap gap-4 text-xs">
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-success-500"></span>
+            <span class="text-gray-600 font-medium">In Stock</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-warning-500"></span>
+            <span class="text-gray-600 font-medium">Low Stock</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <span class="w-2.5 h-2.5 rounded-full bg-danger-500"></span>
+            <span class="text-gray-600 font-medium">Out of Stock</span>
+          </div>
+          <div class="ml-auto font-semibold text-gray-700" id="inventory-total-value">Total Value: 0 UGX</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORY TAB -->
+    <section id="history-tab" class="hidden tab-content">
+      <div class="bg-white rounded-2xl shadow-sm border border-surface-200 overflow-hidden">
+        <div class="p-5 border-b border-surface-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <div>
+              <h2 class="text-base font-bold text-gray-800">Sales History</h2>
+              <p class="text-xs text-gray-400" id="history-count">0 transactions</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <input type="date" id="history-date-filter" onchange="renderSalesHistory()" class="px-3 py-2 text-xs border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 bg-surface-50">
+            <button onclick="exportSalesCSV()" class="px-3 py-2 text-xs font-semibold border border-surface-200 rounded-xl hover:bg-surface-50 transition btn-press flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              Export CSV
+            </button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="bg-surface-50 border-b border-surface-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th class="px-5 py-3">Receipt #</th>
+                <th class="px-5 py-3">Date & Time</th>
+                <th class="px-5 py-3">User</th>
+                <th class="px-5 py-3">Customer</th>
+                <th class="px-5 py-3">Payment</th>
+                <th class="px-5 py-3 text-right">Items</th>
+                <th class="px-5 py-3 text-right">Total</th>
+                <th class="px-5 py-3 text-center">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="history-table-body" class="divide-y divide-surface-100"></tbody>
+          </table>
+        </div>
+        <div class="p-4 bg-surface-50 border-t border-surface-100 flex justify-between items-center">
+          <span class="text-xs text-gray-500" id="history-total-sales">Total: 0 UGX</span>
+          <div class="flex gap-2">
+            <button onclick="clearSalesHistory()" class="text-xs text-danger-600 hover:text-danger-700 font-semibold px-3 py-1.5 rounded-lg hover:bg-danger-50 transition">Clear History</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ACTIVITY TAB -->
+    <section id="activity-tab" class="hidden tab-content space-y-6">
+      <div class="bg-white rounded-2xl shadow-sm border border-surface-200 overflow-hidden">
+        <div class="p-5 border-b border-surface-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center">
+              <svg class="w-4 h-4 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+            </div>
+            <div>
+              <h2 class="text-base font-bold text-gray-800">Activity Log</h2>
+              <p class="text-xs text-gray-400" id="activity-count">0 activities</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-3 w-full sm:w-auto">
+            <select id="activity-user-filter" onchange="renderActivityLog()" class="px-3 py-2 text-xs border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 bg-surface-50">
+              <option value="all">All Users</option>
+            </select>
+            <select id="activity-type-filter" onchange="renderActivityLog()" class="px-3 py-2 text-xs border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 bg-surface-50">
+              <option value="all">All Activities</option>
+              <option value="login">Logins</option>
+              <option value="sale">Sales</option>
+              <option value="inventory">Inventory</option>
+              <option value="settings">Settings</option>
+              <option value="data">Data Management</option>
+            </select>
+            <input type="date" id="activity-date-filter" onchange="renderActivityLog()" class="px-3 py-2 text-xs border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 bg-surface-50">
+            <button onclick="exportActivityCSV()" class="px-3 py-2 text-xs font-semibold border border-surface-200 rounded-xl hover:bg-surface-50 transition btn-press flex items-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+              Export
+            </button>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left">
+            <thead>
+              <tr class="bg-surface-50 border-b border-surface-200 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <th class="px-5 py-3">Time</th>
+                <th class="px-5 py-3">User</th>
+                <th class="px-5 py-3">Action</th>
+                <th class="px-5 py-3">Details</th>
+                <th class="px-5 py-3 text-right">Value</th>
+              </tr>
+            </thead>
+            <tbody id="activity-table-body" class="divide-y divide-surface-100"></tbody>
+          </table>
+        </div>
+        <div class="p-4 bg-surface-50 border-t border-surface-100 flex justify-between items-center">
+          <span class="text-xs text-gray-500" id="activity-total-count">Total: 0 activities</span>
+          <button onclick="clearActivityLog()" class="text-xs text-danger-600 hover:text-danger-700 font-semibold px-3 py-1.5 rounded-lg hover:bg-danger-50 transition">Clear Activity Log</button>
+        </div>
+      </div>
+
+      <!-- User Activity Summary Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="activity-user-summary"></div>
+    </section>
+
+    <!-- SETTINGS TAB -->
+    <section id="settings-tab" class="hidden tab-content max-w-2xl mx-auto space-y-6">
+      <div class="bg-white rounded-2xl shadow-sm border border-surface-200 overflow-hidden">
+        <div class="p-5 border-b border-surface-100">
+          <h2 class="text-base font-bold text-gray-800 flex items-center gap-2">
+            <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            System Settings
+          </h2>
+        </div>
+        <div class="p-5 space-y-6">
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Store Name</label>
+            <input type="text" id="setting-store-name" value="Express Shoppers" class="px-3 py-2.5 text-sm w-full border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 bg-surface-50">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Store Address</label>
+            <input type="text" id="setting-store-address" value="Mbarara, Uganda" class="px-3 py-2.5 text-sm w-full border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 bg-surface-50">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Contact Phone</label>
+            <input type="text" id="setting-store-phone" value="+256 700 000000" class="px-3 py-2.5 text-sm w-full border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 bg-surface-50">
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Tax Rate (%)</label>
+              <input type="number" id="setting-tax-rate" value="0" min="0" max="100" class="px-3 py-2.5 text-sm w-full border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 bg-surface-50">
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Currency Symbol</label>
+              <input type="text" id="setting-currency" value="UGX" class="px-3 py-2.5 text-sm w-full border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 bg-surface-50">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-600 mb-2 uppercase tracking-wider">Receipt Footer Message</label>
+            <input type="text" id="setting-receipt-footer" value="Thank you for shopping with us!" class="px-3 py-2.5 text-sm w-full border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 bg-surface-50">
+          </div>
+          <button onclick="saveSettings()" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-xl transition btn-press shadow-lg shadow-primary-500/25">Save Settings</button>
+        </div>
+      </div>
+
+      <!-- User Management -->
+      <div class="bg-white rounded-2xl shadow-sm border border-surface-200 overflow-hidden">
+        <div class="p-5 border-b border-surface-100">
+          <h2 class="text-base font-bold text-gray-800 flex items-center gap-2">
+            <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+            User Management <span class="text-xs font-normal text-gray-400 ml-1">(Max 4 users)</span>
+          </h2>
+        </div>
+        <div class="p-5 space-y-4">
+          <div id="users-list-container" class="space-y-3"></div>
+          <div id="add-user-section" class="pt-4 border-t border-surface-100">
+            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Add New User</p>
+            <div class="grid grid-cols-3 gap-3">
+              <input type="text" id="new-user-name" placeholder="Full Name" class="px-3 py-2.5 text-sm border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 bg-surface-50">
+              <input type="password" id="new-user-pin" placeholder="PIN (4-6 digits)" maxlength="6" class="px-3 py-2.5 text-sm border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 bg-surface-50 font-mono">
+              <select id="new-user-role" class="px-3 py-2.5 text-sm border border-surface-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/30 bg-surface-50">
+                <option value="Cashier">Cashier</option>
+                <option value="Manager">Manager</option>
+                <option value="Admin">Admin</option>
+              </select>
+            </div>
+            <button onclick="addUser()" id="btn-add-user" class="mt-3 w-full bg-primary-600 hover:bg-primary-700 text-white font-bold py-2.5 rounded-xl transition btn-press shadow-lg shadow-primary-500/25 text-sm flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+              Add User
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-surface-200 overflow-hidden">
+        <div class="p-5 border-b border-surface-100">
+          <h4 class="text-sm font-bold text-gray-800">Data Management</h4>
+        </div>
+        <div class="p-5 space-y-3">
+          <div class="flex flex-col sm:flex-row gap-3">
+            <button onclick="backupData()" class="flex-1 bg-primary-50 hover:bg-primary-100 text-primary-700 font-semibold py-2.5 rounded-xl transition btn-press flex items-center justify-center gap-2 text-sm">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+              Backup Data (JSON)
+            </button>
+            <label class="flex-1 bg-success-50 hover:bg-success-100 text-success-700 font-semibold py-2.5 rounded-xl transition btn-press flex items-center justify-center gap-2 text-sm cursor-pointer">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+              Restore Data (JSON)
+              <input type="file" id="restore-file" accept=".json" onchange="restoreData(this)" class="hidden">
+            </label>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Receipt / Checkout Modal -->
+  <div id="receipt-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 hidden z-50 no-print">
+    <div class="bg-white rounded-2xl max-w-sm w-full shadow-2xl relative slide-up overflow-hidden max-h-[90vh] overflow-y-auto">
+      <div class="bg-primary-600 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-white">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span class="font-bold" id="receipt-modal-title">Sale Complete</span>
+        </div>
+        <button onclick="closeReceiptModal()" class="text-white/70 hover:text-white transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="p-6">
+        <div id="receipt-print-area" class="text-xs font-mono text-black bg-white receipt-paper p-4 rounded-lg">
+          <div class="text-center space-y-1 border-b-2 border-dashed border-gray-300 pb-4 mb-4">
+            <div class="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-2">
+              <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            </div>
+            <h3 class="text-lg font-extrabold tracking-tight text-gray-900 uppercase" id="receipt-store-name">Express Shoppers</h3>
+            <p class="text-gray-500 text-[11px]" id="receipt-store-address">Mbarara, Uganda</p>
+            <p class="text-gray-400 text-[10px] mt-1" id="receipt-store-phone">Tel: +256 700 000000</p>
+            <div class="flex justify-between text-[10px] text-gray-500 mt-2 px-2">
+              <span>Date: <span id="receipt-date">--/--/----</span></span>
+              <span>Ref: <span id="receipt-number">---</span></span>
+            </div>
+            <p class="text-[10px] font-bold text-primary-600 uppercase tracking-wider mt-1" id="receipt-type-label">SALES RECEIPT</p>
+            <div id="receipt-customer-info" class="text-[10px] text-gray-500 mt-1 hidden"></div>
+            <div id="receipt-cashier-info" class="text-[10px] text-gray-500 mt-0.5"></div>
+          </div>
+
+          <table class="w-full text-left mb-3">
+            <thead>
+              <tr class="border-b border-gray-300 text-[10px] uppercase tracking-wider text-gray-500">
+                <th class="pb-2">Item</th>
+                <th class="pb-2 text-center">Qty</th>
+                <th class="pb-2 text-right">Unit</th>
+                <th class="pb-2 text-right">Total</th>
+              </tr>
+            </thead>
+            <tbody id="receipt-items-body" class="text-[11px]"></tbody>
+          </table>
+
+          <div class="border-t-2 border-dashed border-gray-300 pt-3 space-y-1">
+            <div class="flex justify-between text-gray-500 text-[10px]">
+              <span>Subtotal</span>
+              <span id="receipt-subtotal">0 UGX</span>
+            </div>
+            <div class="flex justify-between text-gray-500 text-[10px]" id="receipt-tax-row">
+              <span>Tax (<span id="receipt-tax-rate">0</span>%)</span>
+              <span id="receipt-tax">0 UGX</span>
+            </div>
+            <div class="flex justify-between text-gray-500 text-[10px]">
+              <span>Discount</span>
+              <span id="receipt-discount">0 UGX</span>
+            </div>
+            <div class="flex justify-between text-gray-500 text-[10px]">
+              <span>Items</span>
+              <span id="receipt-item-count">0</span>
+            </div>
+            <div class="flex justify-between text-gray-500 text-[10px]">
+              <span>Payment</span>
+              <span id="receipt-payment">Cash</span>
+            </div>
+            <div class="flex justify-between text-base font-extrabold text-gray-900 pt-1 border-t border-gray-200">
+              <span>TOTAL</span>
+              <span id="receipt-grand-total">0 UGX</span>
+            </div>
+            <div class="flex justify-between text-[10px] text-gray-500 pt-1">
+              <span>Amount Paid</span>
+              <span id="receipt-paid">0 UGX</span>
+            </div>
+            <div class="flex justify-between text-[10px] font-bold text-success-600 pt-1">
+              <span>Change Due</span>
+              <span id="receipt-change">0 UGX</span>
+            </div>
+          </div>
+
+          <div class="text-center text-[10px] mt-6 text-gray-400 border-t border-dashed border-gray-300 pt-4 space-y-0.5">
+            <p class="font-medium text-gray-500" id="receipt-footer-text">Thank you for shopping with us!</p>
+            <p class="text-gray-300 mt-1">--- Express Shoppers POS ---</p>
+          </div>
+        </div>
+
+        <div class="mt-6 flex gap-3 no-print">
+          <button onclick="closeReceiptModal()" class="flex-1 border border-gray-200 text-gray-600 font-semibold py-3 rounded-xl hover:bg-gray-50 transition btn-press flex items-center justify-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            Close
+          </button>
+          <button onclick="window.print()" class="flex-1 bg-primary-600 hover:bg-primary-700 text-white font-bold py-3 rounded-xl transition btn-press shadow-lg shadow-primary-500/25 flex items-center justify-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>
+            Print Receipt
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ==================== APP STATE ====================
+    let inventory = [];
+    let cart = [];
+    let activeCategory = 'all';
+    let receiptCounter = parseInt(localStorage.getItem('express_shoppers_receipt_counter') || '1000');
+    let salesHistory = JSON.parse(localStorage.getItem('express_shoppers_sales') || '[]');
+    let activityLog = JSON.parse(localStorage.getItem('express_shoppers_activity') || '[]');
+    let currentUser = null;
+    let selectedLoginUser = null;
+
+    const MAX_USERS = 4;
+    const DEFAULT_USERS = [
+      { id: 'user-1', name: 'Admin User', pin: '1234', role: 'Admin', color: 'bg-primary-500' },
+      { id: 'user-2', name: 'Manager One', pin: '5678', role: 'Manager', color: 'bg-success-500' },
+      { id: 'user-3', name: 'Cashier One', pin: '0000', role: 'Cashier', color: 'bg-warning-500' }
+    ];
+
+    let users = JSON.parse(localStorage.getItem('express_shoppers_users') || 'null') || DEFAULT_USERS.map(u => ({...u}));
+
+    let appSettings = JSON.parse(localStorage.getItem('express_shoppers_settings') || JSON.stringify({
+      storeName: 'Express Shoppers',
+      storeAddress: 'Mbarara, Uganda',
+      storePhone: '+256 700 000000',
+      taxRate: 0,
+      currency: 'UGX',
+      receiptFooter: 'Thank you for shopping with us!',
+      pin: '1234'
+    }));
+
+    const CATEGORIES = ['Food', 'Beverages', 'Household', 'Personal Care', 'Electronics', 'General'];
+    const CAT_COLORS = {
+      'Food': 'bg-orange-100 text-orange-700',
+      'Beverages': 'bg-sky-100 text-sky-700',
+      'Household': 'bg-emerald-100 text-emerald-700',
+      'Personal Care': 'bg-pink-100 text-pink-700',
+      'Electronics': 'bg-violet-100 text-violet-700',
+      'General': 'bg-gray-100 text-gray-600',
+    };
+
+    const ROLE_COLORS = {
+      'Admin': 'bg-primary-100 text-primary-700',
+      'Manager': 'bg-success-100 text-success-700',
+      'Cashier': 'bg-warning-100 text-warning-700'
+    };
+
+    const ACTIVITY_ICONS = {
+      'login': '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/></svg>',
+      'logout': '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>',
+      'sale': '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+      'inventory': '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>',
+      'settings': '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>',
+      'data': '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5v10c0 2.21-3.582 4-8 4s-8-1.79-8-4V12"/></svg>',
+      'user': '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>'
+    };
+
+    const ACTIVITY_COLORS = {
+      'login': 'bg-primary-100 text-primary-700',
+      'logout': 'bg-gray-100 text-gray-600',
+      'sale': 'bg-success-100 text-success-700',
+      'inventory': 'bg-warning-100 text-warning-700',
+      'settings': 'bg-sky-100 text-sky-700',
+      'data': 'bg-violet-100 text-violet-700',
+      'user': 'bg-pink-100 text-pink-700'
+    };
+
+    // Seed Data - with Expiration Tracking
+    const sampleInventory = [
+      { id: "UG-SUG-01", name: "Kakira Sugar 1kg", price: 5000, stock: 45, category: "Food", expiryDate: "2026-12-01", isPerishable: true },
+      { id: "UG-MLK-02", name: "Fresh Dairy Milk 1L", price: 3500, stock: 20, category: "Beverages", expiryDate: "2026-07-12", isPerishable: true },
+      { id: "UG-RCE-03", name: "Super Rice 1kg", price: 6000, stock: 12, category: "Food", expiryDate: "2026-11-15", isPerishable: true },
+      { id: "UG-BCH-04", name: "Nice Biscuits Pack", price: 2500, stock: 4, category: "Food", expiryDate: "2026-07-09", isPerishable: true },
+      { id: "UG-SOA-05", name: "Washing Soap Bar", price: 1500, stock: 30, category: "Household", expiryDate: null, isPerishable: false },
+      { id: "UG-TBR-06", name: "Toothpaste 150g", price: 2800, stock: 18, category: "Personal Care", expiryDate: "2027-07-01", isPerishable: true },
+      { id: "UG-BRD-07", name: "Bread White 500g", price: 3500, stock: 8, category: "Food", expiryDate: "2026-07-11", isPerishable: true },
+      { id: "UG-COK-08", name: "Coca Cola 500ml", price: 2000, stock: 50, category: "Beverages", expiryDate: "2026-10-15", isPerishable: true },
+      { id: "UG-FLT-09", name: "Phone Charger USB", price: 12000, stock: 6, category: "Electronics", expiryDate: null, isPerishable: false },
+      { id: "UG-SLT-10", name: "Iodized Salt 500g", price: 1000, stock: 60, category: "Food", expiryDate: "2027-01-20", isPerishable: true },
+      { id: "UG-TEA-11", name: "Fresh Tea Leaves 100g", price: 3000, stock: 25, category: "Beverages", expiryDate: "2026-07-05", isPerishable: true },
+      { id: "UG-OIL-12", name: "Cooking Oil 1L", price: 8500, stock: 15, category: "Food", expiryDate: "2026-12-15", isPerishable: true },
+      { id: "UG-SPR-13", name: "Sprite 500ml", price: 2000, stock: 40, category: "Beverages", expiryDate: "2026-10-01", isPerishable: true },
+      { id: "UG-SHW-14", name: "Shampoo 200ml", price: 4500, stock: 10, category: "Personal Care", expiryDate: "2027-03-10", isPerishable: true },
+      { id: "UG-BAT-15", name: "AA Batteries 4pk", price: 3500, stock: 22, category: "Electronics", expiryDate: null, isPerishable: false },
+    ];
+
+    // ==================== INITIALIZATION ====================
+    window.onload = function() {
+      const stored = localStorage.getItem("express_shoppers_inventory");
+      inventory = stored ? JSON.parse(stored) : sampleInventory.map(i => ({...i}));
+      inventory.forEach(item => { 
+        if (!item.category) item.category = 'General'; 
+        if (!('expiryDate' in item)) item.expiryDate = null;
+        if (!('isPerishable' in item)) item.isPerishable = ['Food','Beverages','Personal Care'].includes(item.category);
+      });
+
+      loadSettings();
+      saveInventoryToStorage();
+      renderCategoryPills();
+      renderPosProducts();
+      renderCart();
+      renderInventoryTable();
+      renderDashboard();
+      renderSalesHistory();
+      renderActivityLog();
+      renderUserManagement();
+      updateNavUser();
+
+      // Check login
+      const savedUser = localStorage.getItem('express_shoppers_current_user');
+      if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        document.getElementById('login-overlay').classList.add('hidden');
+        updateNavUser();
+      } else {
+        renderLoginUsers();
+        document.getElementById('login-overlay').classList.remove('hidden');
+      }
+    };
+
+    function saveInventoryToStorage() {
+      localStorage.setItem("express_shoppers_inventory", JSON.stringify(inventory));
+    }
+
+    function saveSalesHistory() {
+      localStorage.setItem("express_shoppers_sales", JSON.stringify(salesHistory));
+    }
+
+    function saveActivityLog() {
+      localStorage.setItem("express_shoppers_activity", JSON.stringify(activityLog));
+    }
+
+    function saveUsers() {
+      localStorage.setItem("express_shoppers_users", JSON.stringify(users));
+    }
+
+    function saveSettings() {
+      localStorage.setItem("express_shoppers_settings", JSON.stringify(appSettings));
+    }
+
+    function loadSettings() {
+      document.getElementById('setting-store-name').value = appSettings.storeName;
+      document.getElementById('setting-store-address').value = appSettings.storeAddress;
+      document.getElementById('setting-store-phone').value = appSettings.storePhone;
+      document.getElementById('setting-tax-rate').value = appSettings.taxRate;
+      document.getElementById('setting-currency').value = appSettings.currency;
+      document.getElementById('setting-receipt-footer').value = appSettings.receiptFooter;
+    }
+
+    // ==================== ACTIVITY LOGGING ====================
+    function logActivity(type, description, value = null, details = '') {
+      const entry = {
+        id: 'act-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+        userId: currentUser ? currentUser.id : 'system',
+        userName: currentUser ? currentUser.name : 'System',
+        userRole: currentUser ? currentUser.role : 'System',
+        type: type,
+        description: description,
+        details: details,
+        value: value,
+        timestamp: new Date().toISOString()
+      };
+      activityLog.push(entry);
+      saveActivityLog();
+    }
+
+    // ==================== LOGIN SYSTEM ====================
+    function renderLoginUsers() {
+      const grid = document.getElementById('login-user-grid');
+      grid.innerHTML = '';
+      users.forEach(user => {
+        const card = document.createElement('button');
+        card.className = `user-card p-4 rounded-xl border border-surface-200 bg-surface-50 text-center flex flex-col items-center gap-2 transition`;
+        card.onclick = () => selectLoginUser(user, card);
+        card.innerHTML = `
+          <div class="w-12 h-12 ${user.color} rounded-full flex items-center justify-center text-white font-bold text-lg shadow-sm">${user.name.charAt(0).toUpperCase()}</div>
+          <div>
+            <div class="text-sm font-bold text-gray-800">${user.name}</div>
+            <div class="text-[10px] font-semibold px-2 py-0.5 rounded-md ${ROLE_COLORS[user.role] || 'bg-gray-100 text-gray-600'} mt-0.5 inline-block">${user.role}</div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+    function selectLoginUser(user, element) {
+      
+      selectedLoginUser = user;
+      document.querySelectorAll('.user-card').forEach(c => {
+        c.classList.remove('selected', 'ring-2', 'ring-primary-500', 'bg-primary-50');
+      });
+      event.currentTarget.classList.add('selected', 'ring-2', 'ring-primary-500', 'bg-primary-50');
+      const btn = document.getElementById('btn-continue-login');
+      btn.disabled = false;
+      btn.classList.remove('bg-gray-300', 'cursor-not-allowed');
+      btn.classList.add('bg-primary-600', 'hover:bg-primary-700');
+    }
+
+    function showPinEntry() {
+      if (!selectedLoginUser) return;
+      document.getElementById('login-step-select').classList.add('hidden');
+      document.getElementById('login-step-pin').classList.remove('hidden');
+      document.getElementById('login-selected-name').textContent = selectedLoginUser.name;
+      document.getElementById('login-selected-avatar').textContent = selectedLoginUser.name.charAt(0).toUpperCase();
+      document.getElementById('login-selected-avatar').className = `w-8 h-8 rounded-full ${selectedLoginUser.color} flex items-center justify-center text-sm font-bold text-white`;
+      document.getElementById('login-pin').value = '';
+      document.getElementById('login-pin').focus();
+    }
+
+    function backToUserSelect() {
+      selectedLoginUser = null;
+      document.getElementById('login-step-pin').classList.add('hidden');
+      document.getElementById('login-step-select').classList.remove('hidden');
+      const btn = document.getElementById('btn-continue-login');
+      btn.disabled = true;
+      btn.classList.add('bg-gray-300', 'cursor-not-allowed');
+      btn.classList.remove('bg-primary-600', 'hover:bg-primary-700');
+      renderLoginUsers();
+    }
+
+    function doLogin() {
+      if (!selectedLoginUser) return;
+      const pin = document.getElementById('login-pin').value.trim();
+      if (pin === selectedLoginUser.pin) {
+        currentUser = selectedLoginUser;
+        localStorage.setItem('express_shoppers_current_user', JSON.stringify(currentUser));
+        document.getElementById('login-overlay').classList.add('hidden');
+        updateNavUser();
+        logActivity('login', `${currentUser.name} logged in`, null, `Role: ${currentUser.role}`);
+        showToast(`Welcome, ${currentUser.name}!`, 'success');
+        renderActivityLog();
+      } else {
+        showToast('Invalid PIN', 'error');
+        document.getElementById('login-pin').classList.add('shake');
+        setTimeout(() => document.getElementById('login-pin').classList.remove('shake'), 400);
+      }
+    }
+
+    function doLogout() {
+      if (currentUser) {
+        logActivity('logout', `${currentUser.name} logged out`);
+      }
+      currentUser = null;
+      localStorage.removeItem('express_shoppers_current_user');
+      selectedLoginUser = null;
+      backToUserSelect();
+      document.getElementById('login-overlay').classList.remove('hidden');
+      renderLoginUsers();
+    }
+
+    function updateNavUser() {
+      const badge = document.getElementById('current-user-badge');
+      const avatar = document.getElementById('nav-user-avatar');
+      const name = document.getElementById('nav-user-name');
+      if (currentUser) {
+        badge.classList.remove('hidden');
+        avatar.textContent = currentUser.name.charAt(0).toUpperCase();
+        avatar.className = `w-6 h-6 rounded-full ${currentUser.color} flex items-center justify-center text-xs font-bold text-white`;
+        name.textContent = currentUser.name;
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+
+    // ==================== USER MANAGEMENT ====================
+    function renderUserManagement() {
+      const container = document.getElementById('users-list-container');
+      const addSection = document.getElementById('add-user-section');
+      const addBtn = document.getElementById('btn-add-user');
+
+      container.innerHTML = '';
+      users.forEach((user, index) => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center gap-3 p-3 bg-surface-50 rounded-xl border border-surface-100';
+        div.innerHTML = `
+          <div class="w-10 h-10 ${user.color} rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0">${user.name.charAt(0).toUpperCase()}</div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+              <span class="font-semibold text-sm text-gray-900">${user.name}</span>
+              <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${ROLE_COLORS[user.role] || 'bg-gray-100 text-gray-600'}">${user.role}</span>
+            </div>
+            <div class="text-[11px] text-gray-400 font-mono">PIN: ${'*'.repeat(user.pin.length)}</div>
+          </div>
+          <div class="flex items-center gap-1">
+            <button onclick="editUserPin(${index})" class="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition" title="Change PIN">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+            </button>
+            ${users.length > 1 ? `<button onclick="removeUser(${index})" class="p-1.5 text-gray-400 hover:text-danger-600 hover:bg-danger-50 rounded-lg transition" title="Remove User"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg></button>` : ''}
+          </div>
+        `;
+        container.appendChild(div);
+      });
+
+      if (users.length >= MAX_USERS) {
+        addSection.classList.add('hidden');
+      } else {
+        addSection.classList.remove('hidden');
+      }
+    }
+
+    function addUser() {
+      if (users.length >= MAX_USERS) {
+        showToast('Maximum 4 users allowed', 'warning');
+        return;
+      }
+      const name = document.getElementById('new-user-name').value.trim();
+      const pin = document.getElementById('new-user-pin').value.trim();
+      const role = document.getElementById('new-user-role').value;
+
+      if (!name || !pin || pin.length < 4) {
+        showToast('Name and PIN (min 4 digits) required', 'warning');
+        return;
+      }
+
+      const colors = ['bg-primary-500', 'bg-success-500', 'bg-warning-500', 'bg-danger-500', 'bg-sky-500', 'bg-violet-500'];
+      const usedColors = users.map(u => u.color);
+      const availableColor = colors.find(c => !usedColors.includes(c)) || colors[users.length % colors.length];
+
+      users.push({
+        id: 'user-' + Date.now(),
+        name,
+        pin,
+        role,
+        color: availableColor
+      });
+      saveUsers();
+      renderUserManagement();
+      renderLoginUsers();
+      document.getElementById('new-user-name').value = '';
+      document.getElementById('new-user-pin').value = '';
+      document.getElementById('new-user-role').value = 'Cashier';
+      logActivity('user', `New user "${name}" added as ${role}`);
+      showToast(`User "${name}" added successfully`, 'success');
+    }
+
+    function removeUser(index) {
+      const user = users[index];
+      if (users.length <= 1) {
+        showToast('At least one user required', 'warning');
+        return;
+      }
+      showConfirmModal('Remove User?', `Remove ${user.name} (${user.role})?`, () => {
+        users.splice(index, 1);
+        saveUsers();
+        renderUserManagement();
+        renderLoginUsers();
+        logActivity('user', `User "${user.name}" removed`);
+        showToast('User removed', 'info');
+      });
+    }
+
+    function editUserPin(index) {
+      const user = users[index];
+      const newPin = prompt(`Enter new PIN for ${user.name} (min 4 digits):`, '');
+      if (newPin && newPin.length >= 4) {
+        user.pin = newPin;
+        saveUsers();
+        logActivity('user', `PIN changed for "${user.name}"`);
+        showToast('PIN updated', 'success');
+        renderUserManagement();
+      } else if (newPin) {
+        showToast('PIN must be at least 4 digits', 'warning');
+      }
+    }
+
+    // ==================== TOAST NOTIFICATIONS ====================
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+
+      const icons = {
+        success: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>',
+        error: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>',
+        warning: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>',
+        info: '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>'
+      };
+
+      const styles = {
+        success: 'bg-white border border-success-200 shadow-lg shadow-success-500/10',
+        error: 'bg-white border border-danger-200 shadow-lg shadow-danger-500/10',
+        warning: 'bg-white border border-warning-200 shadow-lg shadow-warning-500/10',
+        info: 'bg-white border border-primary-200 shadow-lg shadow-primary-500/10',
+      };
+
+      const iconColors = {
+        success: 'text-success-500 bg-success-50',
+        error: 'text-danger-500 bg-danger-50',
+        warning: 'text-warning-500 bg-warning-50',
+        info: 'text-primary-500 bg-primary-50',
+      };
+
+      toast.className = `toast-enter pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl ${styles[type]}`;
+      toast.innerHTML = `
+        <span class="w-8 h-8 rounded-lg ${iconColors[type]} flex items-center justify-center flex-shrink-0">${icons[type]}</span>
+        <span class="text-sm font-medium text-gray-700">${message}</span>
+      `;
+
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.style.transition = 'all 0.3s ease-out';
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(40px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // ==================== CONFIRM MODAL ====================
+    let confirmCallback = null;
+
+    function showConfirmModal(title, message, callback) {
+      document.getElementById('confirm-title').textContent = title;
+      document.getElementById('confirm-message').textContent = message;
+      confirmCallback = callback;
+      document.getElementById('confirm-modal').classList.remove('hidden');
+    }
+
+    function closeConfirmModal() {
+      document.getElementById('confirm-modal').classList.add('hidden');
+      confirmCallback = null;
+    }
+
+    document.getElementById('confirm-action-btn').addEventListener('click', () => {
+      if (confirmCallback) confirmCallback();
+      closeConfirmModal();
+    });
+
+    function showResetConfirm() {
+      showConfirmModal(
+        'Reset All Data?',
+        'This will restore default products and clear all custom data. This action cannot be undone.',
+        () => {
+          localStorage.removeItem("express_shoppers_inventory");
+          localStorage.removeItem("express_shoppers_sales");
+          localStorage.removeItem("express_shoppers_activity");
+          inventory = sampleInventory.map(i => ({...i}));
+          salesHistory = [];
+          activityLog = [];
+          saveInventoryToStorage();
+          saveSalesHistory();
+          saveActivityLog();
+          cart = [];
+          renderInventoryTable();
+          renderPosProducts();
+          renderCart();
+          renderDashboard();
+          renderSalesHistory();
+          renderActivityLog();
+          renderCategoryPills();
+          logActivity('data', 'All data reset to defaults');
+          showToast('All data has been reset to defaults', 'info');
+        }
+      );
+    }
+
+    // ==================== NAVIGATION ====================
+    function switchTab(tabId) {
+      const tabs = ['dashboard-tab', 'pos-tab', 'inventory-tab', 'history-tab', 'activity-tab', 'settings-tab'];
+      tabs.forEach(t => document.getElementById(t).classList.add('hidden'));
+      document.getElementById(tabId).classList.remove('hidden');
+
+      const buttons = ['btn-dashboard-tab', 'btn-pos-tab', 'btn-inventory-tab', 'btn-history-tab', 'btn-activity-tab', 'btn-settings-tab'];
+      buttons.forEach(b => {
+        const btn = document.getElementById(b);
+        btn.classList.remove('nav-active', 'bg-white/15');
+        btn.classList.add('hover:bg-white/10');
+      });
+      const activeBtn = document.getElementById('btn-' + tabId);
+      activeBtn.classList.add('nav-active', 'bg-white/15');
+      activeBtn.classList.remove('hover:bg-white/10');
+
+      if (tabId === 'dashboard-tab') renderDashboard();
+      if (tabId === 'history-tab') renderSalesHistory();
+      if (tabId === 'activity-tab') renderActivityLog();
+    }
+
+    // ==================== CATEGORY FILTERS ====================
+    function renderCategoryPills() {
+      const container = document.getElementById('category-pills');
+      const uniqueCats = ['all', ...new Set(inventory.map(i => i.category).filter(Boolean))];
+
+      container.innerHTML = uniqueCats.map(cat => `
+        <button onclick="filterCategory('${cat}')" id="cat-${cat}"
+          class="cat-pill ${cat === 'all' ? 'bg-primary-600 text-white' : 'bg-surface-100 text-gray-600 hover:bg-surface-200'} px-3.5 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap btn-press">
+          ${cat === 'all' ? 'All Products' : cat}
+        </button>
+      `).join('');
+    }
+
+    function filterCategory(cat) {
+      activeCategory = cat;
+      document.querySelectorAll('.cat-pill').forEach(btn => {
+        btn.className = 'cat-pill bg-surface-100 text-gray-600 hover:bg-surface-200 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap btn-press';
+      });
+      const active = document.getElementById('cat-' + cat);
+      if (active) active.className = 'cat-pill bg-primary-600 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold transition whitespace-nowrap btn-press';
+      renderPosProducts();
+    }
+
+    // ==================== STOCK HELPERS ====================
+    function getStockStatus(stock) {
+      if (stock === 0) return { label: 'Out of Stock', class: 'bg-danger-100 text-danger-700 border-danger-200', bar: 'bg-danger-500', pct: 0 };
+      if (stock <= 5) return { label: 'Low Stock', class: 'bg-warning-100 text-warning-700 border-warning-200', bar: 'bg-warning-500', pct: Math.min(stock / 5 * 30, 30) };
+      if (stock <= 15) return { label: 'In Stock', class: 'bg-success-100 text-success-700 border-success-200', bar: 'bg-success-500', pct: 50 };
+      return { label: 'Well Stocked', class: 'bg-success-100 text-success-700 border-success-200', bar: 'bg-success-500', pct: 100 };
+    }
+
+    // ==================== EXPIRY HELPERS ====================
+    function getExpiryStatus(expiryDate) {
+      if (!expiryDate) return { label: 'Non-perishable', class: 'bg-gray-100 text-gray-500 border-gray-200', days: Infinity, expired: false };
+      const today = new Date(); today.setHours(0,0,0,0);
+      const exp = new Date(expiryDate); exp.setHours(0,0,0,0);
+      const diff = Math.ceil((exp - today) / (1000*60*60*24));
+      if (diff < 0) return { label: `Expired ${Math.abs(diff)}d ago`, class: 'bg-danger-100 text-danger-700 border-danger-200', days: diff, expired: true };
+      if (diff === 0) return { label: 'Expires today', class: 'bg-danger-100 text-danger-700 border-danger-200', days: diff, expired: false };
+      if (diff <= 3) return { label: `Expires in ${diff}d`, class: 'bg-danger-50 text-danger-600 border-danger-200', days: diff, expired: false };
+      if (diff <= 7) return { label: `Expires in ${diff}d`, class: 'bg-warning-100 text-warning-700 border-warning-200', days: diff, expired: false };
+      if (diff <= 30) return { label: `Exp in ${diff}d`, class: 'bg-amber-100 text-amber-700 border-amber-200', days: diff, expired: false };
+      return { label: new Date(expiryDate).toLocaleDateString('en-GB'), class: 'bg-success-50 text-success-700 border-success-100', days: diff, expired: false };
+    }
+    function isExpired(expiryDate) {
+      if (!expiryDate) return false;
+      const today = new Date(); today.setHours(0,0,0,0);
+      return new Date(expiryDate) < today;
+    }
+    function formatExpiryDate(dateStr) {
+      if (!dateStr) return '—';
+      return new Date(dateStr).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+
+    function getProductInitial(name) {
+      return name.charAt(0).toUpperCase();
+    }
+
+    function getProductColor(id) {
+      const colors = ['bg-primary-500', 'bg-success-500', 'bg-warning-500', 'bg-danger-500', 'bg-sky-500', 'bg-violet-500', 'bg-pink-500', 'bg-teal-500'];
+      let hash = 0;
+      for (let i = 0; i < id.length; i++) hash = id.charCodeAt(i) + ((hash << 5) - hash);
+      return colors[Math.abs(hash) % colors.length];
+    }
+
+    // ==================== DASHBOARD ====================
+    function renderDashboard() {
+      const today = new Date().toDateString();
+      const todaySales = salesHistory.filter(s => new Date(s.date).toDateString() === today);
+      const todayTotal = todaySales.reduce((sum, s) => sum + s.total, 0);
+      document.getElementById('dash-today-sales').textContent = todayTotal.toLocaleString() + ' ' + appSettings.currency;
+      document.getElementById('dash-today-count').textContent = todaySales.length;
+
+      const totalValue = inventory.reduce((sum, item) => sum + item.price * item.stock, 0);
+      document.getElementById('dash-inventory-value').textContent = totalValue.toLocaleString() + ' ' + appSettings.currency;
+      document.getElementById('dash-total-products').textContent = inventory.length;
+
+      const lowStock = inventory.filter(i => i.stock > 0 && i.stock <= 5).length;
+      const outStock = inventory.filter(i => i.stock === 0).length;
+      document.getElementById('dash-low-stock').textContent = lowStock;
+      document.getElementById('dash-out-stock').textContent = outStock;
+
+      // Expiry KPIs
+      const expiredItems = inventory.filter(i => isExpired(i.expiryDate));
+      const expiringSoonItems = inventory.filter(i => {
+        const s = getExpiryStatus(i.expiryDate);
+        return s.days >=0 && s.days <= 7;
+      });
+      const expiredCountEl = document.getElementById('dash-expired-count');
+      const expiringCountEl = document.getElementById('dash-expiring-count');
+      if (expiredCountEl) expiredCountEl.textContent = expiredItems.length;
+      if (expiringCountEl) expiringCountEl.textContent = expiringSoonItems.length;
+
+      const expiredValue = expiredItems.reduce((sum, i) => sum + i.price * i.stock, 0);
+      const riskValue = expiringSoonItems.reduce((sum, i) => sum + i.price * i.stock, 0);
+      const safeCount = inventory.filter(i => !isExpired(i.expiryDate) && getExpiryStatus(i.expiryDate).days > 30).length;
+      const wasteExpiredEl = document.getElementById('waste-expired-value');
+      const wasteRiskEl = document.getElementById('waste-risk-value');
+      const wasteSafeEl = document.getElementById('waste-safe-count');
+      if (wasteExpiredEl) wasteExpiredEl.textContent = expiredValue.toLocaleString() + ' ' + appSettings.currency;
+      if (wasteRiskEl) wasteRiskEl.textContent = riskValue.toLocaleString() + ' ' + appSettings.currency;
+      if (wasteSafeEl) wasteSafeEl.textContent = safeCount;
+
+      // Render expiry alerts list
+      const alertContainer = document.getElementById('dash-expiry-alerts');
+      if (alertContainer) {
+        const allAlerts = inventory
+          .filter(i => i.expiryDate)
+          .map(i => ({ item: i, status: getExpiryStatus(i.expiryDate) }))
+          .filter(x => x.status.expired || x.status.days <= 30)
+          .sort((a,b) => a.status.days - b.status.days)
+          .slice(0, 8);
+        if (allAlerts.length === 0) {
+          alertContainer.innerHTML = '<p class="p-6 text-xs text-gray-400 text-center">No expiry alerts — all perishables are safe</p>';
+        } else {
+          alertContainer.innerHTML = allAlerts.map(({item, status}) => `
+            <div class="p-3 flex items-center justify-between hover:bg-surface-50 transition">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-8 h-8 ${status.expired ? 'bg-danger-100 text-danger-600' : status.days <=7 ? 'bg-warning-100 text-warning-600' : 'bg-amber-50 text-amber-600'} rounded-lg flex items-center justify-center font-bold text-xs flex-shrink-0">
+                  ${getProductInitial(item.name)}
+                </div>
+                <div class="min-w-0">
+                  <div class="text-xs font-semibold text-gray-900 truncate">${item.name}</div>
+                  <div class="text-[10px] text-gray-400">${item.stock} units • ${formatExpiryDate(item.expiryDate)} • <span class="${status.expired ? 'text-danger-600 font-bold' : 'text-gray-500'}">${status.label}</span></div>
+                </div>
+              </div>
+              <div class="flex gap-1">
+                ${status.expired ? `<button onclick="deleteProduct('${item.id}')" class="text-[10px] px-2 py-1 bg-danger-50 text-danger-600 rounded-md border border-danger-200 hover:bg-danger-100">Remove</button>` : `<button onclick="openEditModal('${item.id}')" class="text-[10px] px-2 py-1 bg-warning-50 text-warning-700 rounded-md border border-warning-200 hover:bg-warning-100">Discount</button>`}
+              </div>
+            </div>
+          `).join('');
+        }
+      }
+
+      const productSales = {};
+      salesHistory.forEach(sale => {
+        sale.items.forEach(item => {
+          productSales[item.name] = (productSales[item.name] || 0) + item.quantity;
+        });
+      });
+      const topProducts = Object.entries(productSales).sort((a, b) => b[1] - a[1]).slice(0, 5);
+      const topContainer = document.getElementById('dash-top-products');
+      if (topProducts.length === 0) {
+        topContainer.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">No sales data yet</p>';
+      } else {
+        topContainer.innerHTML = topProducts.map(([name, qty], i) => `
+          <div class="flex items-center gap-3">
+            <div class="w-6 h-6 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-[10px] font-bold">${i+1}</div>
+            <div class="flex-1">
+              <div class="flex justify-between text-xs font-semibold text-gray-700 mb-0.5">
+                <span class="truncate">${name}</span>
+                <span>${qty} sold</span>
+              </div>
+              <div class="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div class="h-full bg-primary-500 rounded-full chart-bar" style="width: ${Math.min((qty / topProducts[0][1]) * 100, 100)}%"></div>
+              </div>
+            </div>
+          </div>
+        `).join('');
+      }
+
+      const recentSales = salesHistory.slice(-5).reverse();
+      const recentContainer = document.getElementById('dash-recent-sales');
+      if (recentSales.length === 0) {
+        recentContainer.innerHTML = '<tr><td colspan="6" class="py-4 text-xs text-gray-400 text-center">No transactions yet</td></tr>';
+      } else {
+        recentContainer.innerHTML = recentSales.map(s => `
+          <tr class="hover:bg-surface-50 transition">
+            <td class="py-2.5 font-mono text-xs text-primary-600 font-semibold">${s.receiptNumber}</td>
+            <td class="py-2.5 text-xs text-gray-500">${new Date(s.date).toLocaleString('en-GB', {hour: '2-digit', minute:'2-digit', day: 'numeric', month: 'short'})}</td>
+            <td class="py-2.5 text-xs text-gray-600"><span class="px-1.5 py-0.5 rounded-md bg-surface-100 font-semibold">${s.cashierName || 'Unknown'}</span></td>
+            <td class="py-2.5 text-xs text-gray-700 text-right">${s.itemCount}</td>
+            <td class="py-2.5 text-xs font-bold text-gray-900 text-right">${s.total.toLocaleString()} ${appSettings.currency}</td>
+            <td class="py-2.5 text-center">
+              <button onclick="reprintReceipt('${s.receiptNumber}')" class="text-xs text-primary-600 hover:text-primary-700 font-semibold">Reprint</button>
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      const catCounts = {};
+      inventory.forEach(i => { catCounts[i.category] = (catCounts[i.category] || 0) + 1; });
+      const maxCat = Math.max(...Object.values(catCounts), 1);
+      document.getElementById('dash-category-chart').innerHTML = Object.entries(catCounts).map(([cat, count]) => `
+        <div class="flex-1 flex flex-col items-center gap-1">
+          <div class="w-full bg-gray-100 rounded-t-lg overflow-hidden relative" style="height: 100px;">
+            <div class="absolute bottom-0 w-full bg-primary-400 rounded-t-lg chart-bar" style="height: ${(count / maxCat) * 100}%"></div>
+          </div>
+          <span class="text-[10px] font-semibold text-gray-600 text-center leading-tight">${cat}</span>
+          <span class="text-[10px] text-gray-400">${count}</span>
+        </div>
+      `).join('');
+    }
+
+    // ==================== INVENTORY TABLE ====================
+    let expiryFilter = 'all';
+    function filterExpiry(type) {
+      expiryFilter = type;
+      renderDashboard();
+      renderInventoryTable();
+      if (type !== 'all') switchTab('inventory-tab');
+    }
+
+    function renderInventoryTable() {
+      const tbody = document.getElementById("inventory-table-body");
+      const searchKey = document.getElementById("inventory-search").value.toLowerCase();
+      tbody.innerHTML = "";
+
+      let filtered = inventory.filter(item =>
+        item.name.toLowerCase().includes(searchKey) || item.id.toLowerCase().includes(searchKey)
+      );
+
+      if (expiryFilter === 'expired') {
+        filtered = filtered.filter(i => isExpired(i.expiryDate));
+      } else if (expiryFilter === 'soon') {
+        filtered = filtered.filter(i => {
+          const s = getExpiryStatus(i.expiryDate);
+          return s.days >=0 && s.days <= 7;
+        });
+      }
+
+      filtered.sort((a,b) => {
+        const aExpired = isExpired(a.expiryDate) ? -1 : 0;
+        const bExpired = isExpired(b.expiryDate) ? -1 : 0;
+        if (aExpired !== bExpired) return aExpired - bExpired;
+        const aExp = a.expiryDate ? new Date(a.expiryDate) : new Date('9999-12-31');
+        const bExp = b.expiryDate ? new Date(b.expiryDate) : new Date('9999-12-31');
+        return aExp - bExp;
+      });
+
+      let totalValue = 0;
+
+      filtered.forEach(item => {
+        totalValue += item.price * item.stock;
+        const status = getStockStatus(item.stock);
+        const expiry = getExpiryStatus(item.expiryDate);
+        const catClass = CAT_COLORS[item.category] || CAT_COLORS['General'];
+        const rowExpired = expiry.expired ? 'bg-danger-50/50' : '';
+
+        const tr = document.createElement("tr");
+        tr.className = `hover:bg-surface-50 transition border-b border-surface-100 group ${rowExpired}`;
+        tr.innerHTML = `
+          <td class="px-5 py-3.5">
+            <div class="flex items-center gap-3">
+              <div class="w-9 h-9 ${getProductColor(item.id)} rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm">
+                ${getProductInitial(item.name)}
+              </div>
+              <div>
+                <div class="font-semibold text-sm text-gray-900 flex items-center gap-1.5">
+                  ${item.name}
+                  ${expiry.expired ? '<span class="w-1.5 h-1.5 bg-danger-500 rounded-full animate-pulse" title="Expired"></span>' : ''}
+                </div>
+                <div class="text-[11px] font-mono text-gray-400">${item.id}</div>
+                <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${catClass} mt-0.5 inline-block">${item.category}</span>
+              </div>
+            </div>
+          </td>
+          <td class="px-5 py-3.5 text-right font-semibold text-sm text-gray-700">${item.price.toLocaleString()} <span class="text-gray-400 text-[10px]">${appSettings.currency}</span></td>
+          <td class="px-5 py-3.5 text-center">
+            <div class="flex flex-col items-center gap-1">
+              <span class="text-sm font-bold text-gray-700">${item.stock}</span>
+              <div class="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div class="h-full ${status.bar} rounded-full stock-bar" style="width: ${status.pct}%"></div>
+              </div>
+            </div>
+          </td>
+          <td class="px-5 py-3.5 text-center">
+            <div class="flex flex-col items-center gap-1">
+              <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold border ${expiry.class}">
+                ${expiry.label}
+              </span>
+              ${item.expiryDate ? `<span class="text-[10px] text-gray-400 font-mono">${formatExpiryDate(item.expiryDate)}</span>` : ''}
+            </div>
+          </td>
+          <td class="px-5 py-3.5 text-center">
+            <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-[10px] font-bold border ${status.class}">
+              ${status.label}
+            </span>
+          </td>
+          <td class="px-5 py-3.5 text-right text-sm font-medium text-gray-600">
+            ${(item.price * item.stock).toLocaleString()}
+          </td>
+          <td class="px-5 py-3.5 text-center">
+            <div class="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition">
+              <button onclick="openEditModal('${item.id}')" class="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition" title="Edit">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+              </button>
+              <button onclick="deleteProduct('${item.id}')" class="p-1.5 text-gray-400 hover:text-danger-600 hover:bg-danger-50 rounded-lg transition" title="Delete">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            </div>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      document.getElementById('inventory-count').textContent = `${filtered.length} product${filtered.length !== 1 ? 's' : ''}${expiryFilter !== 'all' ? ` (${expiryFilter})` : ''}`;
+      document.getElementById('inventory-total-value').textContent = `Total Value: ${totalValue.toLocaleString()} ${appSettings.currency}`;
+    }
+
+    // ==================== EDIT PRODUCT ====================
+    function togglePerishableDefault(category) {
+      const perishableCheck = document.getElementById('form-perishable');
+      if (!perishableCheck) return;
+      const perishableCats = ['Food','Beverages','Personal Care'];
+      perishableCheck.checked = perishableCats.includes(category);
+    }
+
+    function openEditModal(id) {
+      const item = inventory.find(i => i.id === id);
+      if (!item) return;
+      document.getElementById('edit-original-id').value = id;
+      document.getElementById('edit-id').value = item.id;
+      document.getElementById('edit-name').value = item.name;
+      document.getElementById('edit-price').value = item.price;
+      document.getElementById('edit-stock').value = item.stock;
+      document.getElementById('edit-category').value = item.category;
+      document.getElementById('edit-expiry').value = item.expiryDate || '';
+      const perishEl = document.getElementById('edit-perishable');
+      if (perishEl) perishEl.checked = item.isPerishable !== false;
+      document.getElementById('edit-modal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+      document.getElementById('edit-modal').classList.add('hidden');
+    }
+
+    function handleEditProduct(event) {
+      event.preventDefault();
+      const originalId = document.getElementById('edit-original-id').value;
+      const newId = document.getElementById('edit-id').value.trim();
+      const newName = document.getElementById('edit-name').value.trim();
+      const newPrice = parseFloat(document.getElementById('edit-price').value);
+      const newStock = parseInt(document.getElementById('edit-stock').value);
+      const newCategory = document.getElementById('edit-category').value;
+      const newExpiry = document.getElementById('edit-expiry').value || null;
+      const newPerishable = document.getElementById('edit-perishable') ? document.getElementById('edit-perishable').checked : true;
+
+      if (originalId !== newId && inventory.some(i => i.id.toLowerCase() === newId.toLowerCase())) {
+        showToast('Product ID already exists', 'error');
+        return;
+      }
+
+      if (newPerishable && newExpiry && isExpired(newExpiry)) {
+        if (!confirm('This expiry date is in the past. Save as expired (will be blocked from sale)?')) return;
+      }
+
+      const idx = inventory.findIndex(i => i.id === originalId);
+      if (idx !== -1) {
+        inventory[idx] = { id: newId, name: newName, price: newPrice, stock: newStock, category: newCategory, expiryDate: newExpiry, isPerishable: newPerishable };
+        saveInventoryToStorage();
+        renderInventoryTable();
+        renderPosProducts();
+        renderCategoryPills();
+        renderDashboard();
+        closeEditModal();
+        logActivity('inventory', `Product "${newName}" updated`, null, `Price: ${newPrice}, Stock: ${newStock}, Category: ${newCategory}, Expiry: ${newExpiry || 'N/A'}`);
+        showToast('Product updated successfully', 'success');
+      }
+    }
+
+    function deleteProduct(id) {
+      const item = inventory.find(i => i.id === id);
+      showConfirmModal('Delete Product?', 'This product will be permanently removed from inventory.', () => {
+        inventory = inventory.filter(i => i.id !== id);
+        cart = cart.filter(c => c.id !== id);
+        saveInventoryToStorage();
+        renderInventoryTable();
+        renderPosProducts();
+        renderCart();
+        renderCategoryPills();
+        renderDashboard();
+        logActivity('inventory', `Product "${item.name}" deleted`);
+        showToast('Product deleted', 'info');
+      });
+    }
+
+    // ==================== ADD PRODUCT ====================
+    function handleNewProduct(event) {
+      event.preventDefault();
+
+      const newId = document.getElementById("form-id").value.trim();
+      const newName = document.getElementById("form-name").value.trim();
+      const newPrice = parseFloat(document.getElementById("form-price").value);
+      const newStock = parseInt(document.getElementById("form-stock").value);
+      const newCategory = document.getElementById("form-category").value;
+      const newExpiry = document.getElementById("form-expiry").value || null;
+      const newPerishable = document.getElementById("form-perishable") ? document.getElementById("form-perishable").checked : true;
+
+      if (inventory.some(item => item.id.toLowerCase() === newId.toLowerCase())) {
+        showToast(`Product ID "${newId}" already exists`, 'error');
+        const idField = document.getElementById("form-id");
+        idField.classList.add('shake');
+        setTimeout(() => idField.classList.remove('shake'), 400);
+        return;
+      }
+
+      if (newPerishable && newExpiry && isExpired(newExpiry)) {
+        if (!confirm('Expiry date is in the past. Add as expired item (will be blocked from sale)?')) return;
+      }
+
+      inventory.push({ id: newId, name: newName, price: newPrice, stock: newStock, category: newCategory, expiryDate: newExpiry, isPerishable: newPerishable });
+      saveInventoryToStorage();
+
+      renderInventoryTable();
+      renderPosProducts();
+      renderCategoryPills();
+      renderDashboard();
+
+      document.getElementById("add-product-form").reset();
+      const perishReset = document.getElementById('form-perishable');
+      if (perishReset) perishReset.checked = true;
+      document.getElementById("form-id").focus();
+      logActivity('inventory', `New product "${newName}" added`, newPrice, `ID: ${newId}, Stock: ${newStock}, Category: ${newCategory}, Expiry: ${newExpiry || 'N/A'}`);
+      showToast(`"${newName}" added to inventory`, 'success');
+    }
+
+    // ==================== POS PRODUCT GRID ====================
+    function renderPosProducts() {
+      const grid = document.getElementById("pos-products-grid");
+      const searchKey = document.getElementById("pos-search").value.toLowerCase();
+      grid.innerHTML = "";
+
+      let filtered = inventory.filter(item => {
+        const matchesSearch = item.name.toLowerCase().includes(searchKey) || item.id.toLowerCase().includes(searchKey);
+        const matchesCategory = activeCategory === 'all' || item.category === activeCategory;
+        return matchesSearch && matchesCategory;
+      });
+
+      filtered.sort((a,b) => {
+        const aExp = isExpired(a.expiryDate) ? 1 : 0;
+        const bExp = isExpired(b.expiryDate) ? 1 : 0;
+        if (aExp !== bExp) return aExp - bExp;
+        const aDate = a.expiryDate ? new Date(a.expiryDate) : new Date('9999');
+        const bDate = b.expiryDate ? new Date(b.expiryDate) : new Date('9999');
+        return aDate - bDate;
+      });
+
+      document.getElementById('catalog-count').textContent = filtered.length;
+
+      if (filtered.length === 0) {
+        grid.innerHTML = `
+          <div class="col-span-full flex flex-col items-center justify-center py-16 text-center">
+            <div class="w-20 h-20 bg-surface-100 rounded-2xl flex items-center justify-center mb-4">
+              <svg class="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </div>
+            <p class="text-gray-400 font-medium">No products found</p>
+            <p class="text-gray-300 text-sm mt-1">Try adjusting your search or filter</p>
+          </div>
+        `;
+        return;
+      }
+
+      filtered.forEach(item => {
+        const expired = isExpired(item.expiryDate);
+        const expiry = getExpiryStatus(item.expiryDate);
+        const isOutOfStock = item.stock <= 0 || expired;
+        const status = getStockStatus(item.stock);
+        const catClass = CAT_COLORS[item.category] || CAT_COLORS['General'];
+        const inCart = cart.find(c => c.id === item.id);
+
+        const card = document.createElement("div");
+        card.className = `bg-white rounded-2xl border ${expired ? 'border-danger-200 bg-danger-50/30' : 'border-surface-200'} overflow-hidden card-hover ${isOutOfStock ? 'opacity-60' : ''} fade-in`;
+        card.innerHTML = `
+          <div class="p-4">
+            <div class="flex justify-between items-start mb-2">
+              <span class="text-[10px] font-mono font-semibold text-gray-400 bg-surface-100 px-2 py-0.5 rounded-md">${item.id}</span>
+              <div class="flex gap-1">
+                <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md ${catClass}">${item.category}</span>
+                ${item.isPerishable ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${expiry.class}">${expiry.expired ? 'EXPIRED' : expiry.days <=7 && expiry.days>=0 ? 'EXP SOON' : 'PERISHABLE'}</span>` : ''}
+              </div>
+            </div>
+
+            <div class="flex items-center gap-3 mb-2">
+              <div class="w-11 h-11 ${getProductColor(item.id)} rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-sm flex-shrink-0">
+                ${getProductInitial(item.name)}
+              </div>
+              <div class="min-w-0 flex-1">
+                <h3 class="font-bold text-gray-900 leading-tight text-sm truncate">${item.name}</h3>
+                <p class="text-lg font-extrabold text-primary-600 leading-tight">${item.price.toLocaleString()} <span class="text-[10px] font-semibold text-gray-400">${appSettings.currency}</span></p>
+                ${item.expiryDate ? `<p class="text-[10px] ${expiry.expired ? 'text-danger-600 font-bold' : expiry.days <=7 ? 'text-warning-600 font-semibold' : 'text-gray-400'}">${expiry.expired ? '⚠ ' : '⏳ '}${expiry.label} • ${formatExpiryDate(item.expiryDate)}</p>` : '<p class="text-[10px] text-gray-300">Non-perishable</p>'}
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 mb-3">
+              <div class="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div class="h-full ${expired ? 'bg-danger-500' : status.bar} rounded-full stock-bar" style="width: ${expired ? '100' : status.pct}%"></div>
+              </div>
+              <span class="text-[11px] font-semibold ${expired ? 'text-danger-600' : item.stock === 0 ? 'text-danger-500' : item.stock <= 5 ? 'text-warning-600' : 'text-gray-500'}">
+                ${expired ? 'Expired' : item.stock === 0 ? 'None' : item.stock + ' left'}
+              </span>
+            </div>
+
+            <button
+              onclick="addItemToCart('${item.id}')"
+              ${isOutOfStock ? 'disabled' : ''}
+              class="w-full py-2.5 rounded-xl text-xs font-bold transition btn-press flex items-center justify-center gap-1.5
+                ${isOutOfStock
+                  ? expired ? 'bg-danger-100 text-danger-600 border border-danger-200 cursor-not-allowed' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : inCart
+                    ? 'bg-success-50 text-success-700 border border-success-200 hover:bg-success-100'
+                    : 'bg-primary-600 hover:bg-primary-700 text-white shadow-lg shadow-primary-500/20'}"
+            >
+              ${expired
+                ? '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg> Expired - Blocked'
+                : isOutOfStock
+                  ? '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg> Out of Stock'
+                  : inCart
+                    ? '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>In Cart</svg> Added'
+                    : '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>Add to Order</svg>'}
+            </button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+    }
+
+
+        // ==================== BARCODE SCAN ====================
+    function handleBarcodeScan(event) {
+      if (event.key === 'Enter') {
+        const code = event.target.value.trim();
+        if (!code) return;
+        const product = inventory.find(p => p.id.toLowerCase() === code.toLowerCase());
+        if (product) {
+          if (isExpired(product.expiryDate)) {
+            showToast(`${product.name} is expired — cannot sell`, 'error');
+            logActivity('inventory', `Blocked scan of expired product "${product.name}"`);
+          } else if (product.stock > 0) {
+            addItemToCart(product.id);
+            showToast(`Scanned: ${product.name}`, 'success');
+          } else {
+            showToast(`${product.name} is out of stock`, 'warning');
+          }
+        } else {
+          showToast('Product not found', 'error');
+        }
+        event.target.value = '';
+        event.target.focus();
+      }
+    }
+
+    // ==================== CART OPERATIONS ====================
+    function addItemToCart(id) {
+      const targetProduct = inventory.find(p => p.id === id);
+      if (!targetProduct || targetProduct.stock <= 0) return;
+      if (isExpired(targetProduct.expiryDate)) {
+        showToast(`${targetProduct.name} is expired — sale blocked`, 'error');
+        logActivity('inventory', `Blocked attempt to sell expired product "${targetProduct.name}"`, null, `Expired: ${targetProduct.expiryDate}`);
+        return;
+      }
+
+      const existing = cart.find(c => c.id === id);
+
+      if (existing) {
+        if (existing.quantity < targetProduct.stock) {
+          existing.quantity++;
+          showToast(`+1 ${targetProduct.name}`, 'success');
+        } else {
+          showToast(`Max stock reached (${targetProduct.stock})`, 'warning');
+          return;
+        }
+      } else {
+        cart.push({ id: targetProduct.id, name: targetProduct.name, price: targetProduct.price, quantity: 1 });
+        showToast(`${targetProduct.name} added to cart`, 'success');
+      }
+
+      const badge = document.getElementById('cart-count');
+      badge.classList.add('cart-bump');
+      setTimeout(() => badge.classList.remove('cart-bump'), 300);
+
+      renderCart();
+      renderPosProducts();
+    }
+
+    function modifyCartQty(id, changeDelta) {
+      const cartItem = cart.find(c => c.id === id);
+      if (!cartItem) return;
+
+      const product = inventory.find(p => p.id === id);
+      const planned = cartItem.quantity + changeDelta;
+
+      if (planned <= 0) {
+        cart = cart.filter(c => c.id !== id);
+        showToast('Item removed from cart', 'info');
+      } else if (planned <= product.stock) {
+        cartItem.quantity = planned;
+      } else {
+        showToast('Exceeds available stock', 'warning');
+        return;
+      }
+
+      renderCart();
+      renderPosProducts();
+    }
+
+    function removeFromCart(id) {
+      cart = cart.filter(c => c.id !== id);
+      renderCart();
+      renderPosProducts();
+      showToast('Item removed from cart', 'info');
+    }
+
+    function clearCart() {
+      if (cart.length === 0) return;
+      showConfirmModal('Clear Cart?', 'All items in your cart will be removed.', () => {
+        cart = [];
+        renderCart();
+        renderPosProducts();
+        showToast('Cart cleared', 'info');
+      });
+    }
+
+    // ==================== CART RENDERER ====================
+    function renderCart() {
+      const container = document.getElementById("cart-items-container");
+      const grandTotalDisplay = document.getElementById("cart-grand-total");
+      const badgeCount = document.getElementById("cart-count");
+      const itemSummary = document.getElementById("cart-item-summary");
+      const clearBtn = document.getElementById("clear-cart-btn");
+
+      container.innerHTML = "";
+
+      if (cart.length === 0) {
+        container.innerHTML = `
+          <div class="flex flex-col items-center justify-center h-full text-center py-10">
+            <div class="w-16 h-16 bg-surface-100 rounded-2xl flex items-center justify-center mb-3">
+              <svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            </div>
+            <p class="text-sm text-gray-400 font-medium">Your cart is empty</p>
+            <p class="text-xs text-gray-300 mt-1">Add products or scan barcode</p>
+          </div>
+        `;
+        grandTotalDisplay.innerHTML = '0 <span class="text-sm font-semibold">' + appSettings.currency + '</span>';
+        badgeCount.textContent = "0 items";
+        itemSummary.textContent = "0 item(s)";
+        clearBtn.classList.add('hidden');
+        return;
+      }
+
+      clearBtn.classList.remove('hidden');
+
+      let total = 0;
+      let totalUnits = 0;
+
+      cart.forEach(item => {
+        const subtotal = item.price * item.quantity;
+        total += subtotal;
+        totalUnits += item.quantity;
+
+        const div = document.createElement("div");
+        div.className = "flex items-center gap-3 p-3 bg-surface-50 rounded-xl border border-surface-100";
+        div.innerHTML = `
+          <div class="w-9 h-9 ${getProductColor(item.id)} rounded-lg flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm">
+            ${getProductInitial(item.name)}
+          </div>
+          <div class="flex-1 min-w-0">
+            <h4 class="font-semibold text-sm text-gray-800 truncate">${item.name}</h4>
+            <span class="text-[11px] text-gray-400">${item.price.toLocaleString()} ${appSettings.currency} each</span>
+          </div>
+          <div class="flex items-center gap-1">
+            <button onclick="modifyCartQty('${item.id}', -1)" class="w-7 h-7 bg-white border border-surface-200 rounded-lg flex items-center justify-center text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition btn-press shadow-sm">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"/></svg>
+            </button>
+            <span class="w-7 text-center font-bold text-sm text-gray-900">${item.quantity}</span>
+            <button onclick="modifyCartQty('${item.id}', 1)" class="w-7 h-7 bg-white border border-surface-200 rounded-lg flex items-center justify-center text-gray-600 hover:bg-gray-50 hover:border-gray-300 transition btn-press shadow-sm">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+            </button>
+          </div>
+          <div class="text-right min-w-[60px]">
+            <div class="font-bold text-sm text-gray-900">${subtotal.toLocaleString()}</div>
+            <button onclick="removeFromCart('${item.id}')" class="text-[10px] text-gray-400 hover:text-danger-500 transition">Remove</button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+
+      const discount = parseFloat(document.getElementById('cart-discount').value) || 0;
+      const finalTotal = Math.max(0, total - discount);
+
+      grandTotalDisplay.innerHTML = `${finalTotal.toLocaleString()} <span class="text-sm font-semibold">${appSettings.currency}</span>`;
+      badgeCount.textContent = `${totalUnits} item${totalUnits !== 1 ? 's' : ''}`;
+      itemSummary.textContent = `${totalUnits} item(s) in cart`;
+    }
+
+    // ==================== CHECKOUT & RECEIPT ====================
+    function processCheckout() {
+      if (cart.length === 0) {
+        showToast('Cart is empty. Add items first.', 'warning');
+        const container = document.getElementById("cart-items-container");
+        container.classList.add('shake');
+        setTimeout(() => container.classList.remove('shake'), 400);
+        return;
+      }
+
+      const discount = parseFloat(document.getElementById('cart-discount').value) || 0;
+      const paymentMethod = document.getElementById('cart-payment').value;
+      const customerName = document.getElementById('cart-customer-name').value.trim();
+      const customerPhone = document.getElementById('cart-customer-phone').value.trim();
+
+      let subtotal = 0;
+      let totalItems = 0;
+      cart.forEach(item => {
+        subtotal += item.price * item.quantity;
+        totalItems += item.quantity;
+      });
+
+      const taxRate = parseFloat(appSettings.taxRate) || 0;
+      const tax = Math.round(subtotal * (taxRate / 100));
+      const total = Math.max(0, subtotal + tax - discount);
+
+      // Final expiry guard - prevent checkout if any cart item expired while in cart
+      for (const cartItem of cart) {
+        const prod = inventory.find(p => p.id === cartItem.id);
+        if (prod && isExpired(prod.expiryDate)) {
+          showToast(`Cannot checkout: ${prod.name} is expired`, 'error');
+          return;
+        }
+      }
+
+      cart.forEach(cartItem => {
+        const product = inventory.find(p => p.id === cartItem.id);
+        if (product) product.stock -= cartItem.quantity;
+      });
+
+      saveInventoryToStorage();
+
+      receiptCounter++;
+      localStorage.setItem('express_shoppers_receipt_counter', receiptCounter.toString());
+      const receiptNumber = `POS-${receiptCounter}`;
+
+      const saleRecord = {
+        receiptNumber,
+        date: new Date().toISOString(),
+        items: cart.map(c => ({...c})),
+        subtotal,
+        tax,
+        discount,
+        total,
+        itemCount: totalItems,
+        paymentMethod,
+        customerName,
+        customerPhone,
+        cashierId: currentUser ? currentUser.id : null,
+        cashierName: currentUser ? currentUser.name : 'Unknown'
+      };
+      salesHistory.push(saleRecord);
+      saveSalesHistory();
+
+      // Populate receipt
+      document.getElementById('receipt-store-name').textContent = appSettings.storeName;
+      document.getElementById('receipt-store-address').textContent = appSettings.storeAddress;
+      document.getElementById('receipt-store-phone').textContent = 'Tel: ' + appSettings.storePhone;
+      document.getElementById("receipt-date").textContent = new Date().toLocaleString('en-GB');
+      document.getElementById("receipt-number").textContent = receiptNumber;
+      document.getElementById("receipt-type-label").textContent = "SALES RECEIPT";
+      document.getElementById("receipt-footer-text").textContent = appSettings.receiptFooter;
+
+      const customerInfo = document.getElementById('receipt-customer-info');
+      if (customerName || customerPhone) {
+        customerInfo.classList.remove('hidden');
+        customerInfo.textContent = `Customer: ${customerName || 'Walk-in'} ${customerPhone ? '| ' + customerPhone : ''}`;
+      } else {
+        customerInfo.classList.add('hidden');
+      }
+
+      const cashierInfo = document.getElementById('receipt-cashier-info');
+      if (currentUser) {
+        cashierInfo.textContent = `Served by: ${currentUser.name} (${currentUser.role})`;
+      } else {
+        cashierInfo.textContent = '';
+      }
+
+      const receiptBody = document.getElementById("receipt-items-body");
+      receiptBody.innerHTML = "";
+
+      cart.forEach(item => {
+        const cost = item.price * item.quantity;
+        const row = document.createElement("tr");
+        row.className = "border-b border-gray-100";
+        row.innerHTML = `
+          <td class="py-2 pr-2">
+            <div class="font-bold text-gray-900">${item.name}</div>
+            <div class="text-[10px] text-gray-500">${item.price.toLocaleString()} ${appSettings.currency}</div>
+          </td>
+          <td class="py-2 text-center font-bold text-gray-700">${item.quantity}</td>
+          <td class="py-2 text-right text-gray-500">${item.price.toLocaleString()}</td>
+          <td class="py-2 text-right font-bold text-gray-900">${cost.toLocaleString()}</td>
+        `;
+        receiptBody.appendChild(row);
+      });
+
+      document.getElementById("receipt-subtotal").textContent = subtotal.toLocaleString() + " " + appSettings.currency;
+      document.getElementById("receipt-tax-rate").textContent = taxRate;
+      document.getElementById("receipt-tax").textContent = tax.toLocaleString() + " " + appSettings.currency;
+      document.getElementById("receipt-discount").textContent = discount.toLocaleString() + " " + appSettings.currency;
+      document.getElementById("receipt-item-count").textContent = totalItems + " item(s)";
+      document.getElementById("receipt-payment").textContent = paymentMethod;
+      document.getElementById("receipt-grand-total").textContent = total.toLocaleString() + " " + appSettings.currency;
+      document.getElementById("receipt-paid").textContent = total.toLocaleString() + " " + appSettings.currency;
+      document.getElementById("receipt-change").textContent = "0 " + appSettings.currency;
+
+      const itemNames = cart.map(c => c.name).join(', ');
+      logActivity('sale', `Sale completed: ${receiptNumber}`, total, `Items: ${totalItems}, Payment: ${paymentMethod}, Customer: ${customerName || 'Walk-in'}`);
+
+      cart = [];
+      document.getElementById('cart-discount').value = 0;
+      document.getElementById('cart-customer-name').value = '';
+      document.getElementById('cart-customer-phone').value = '';
+      renderCart();
+      renderPosProducts();
+      renderInventoryTable();
+      renderDashboard();
+
+      document.getElementById("receipt-modal").classList.remove("hidden");
+      showToast('Sale completed successfully!', 'success');
+    }
+
+    function closeReceiptModal() {
+      document.getElementById("receipt-modal").classList.add("hidden");
+    }
+
+    // ==================== SALES HISTORY ====================
+    function renderSalesHistory() {
+      const tbody = document.getElementById('history-table-body');
+      const dateFilter = document.getElementById('history-date-filter').value;
+      tbody.innerHTML = "";
+
+      let filtered = salesHistory.slice().reverse();
+      if (dateFilter) {
+        const filterDate = new Date(dateFilter).toDateString();
+        filtered = filtered.filter(s => new Date(s.date).toDateString() === filterDate);
+      }
+
+      let totalSales = 0;
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="py-8 text-center text-sm text-gray-400">No transactions found</td></tr>';
+      } else {
+        filtered.forEach(sale => {
+          totalSales += sale.total;
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-surface-50 transition border-b border-surface-100';
+          tr.innerHTML = `
+            <td class="px-5 py-3 font-mono text-xs text-primary-600 font-semibold">${sale.receiptNumber}</td>
+            <td class="px-5 py-3 text-xs text-gray-500">${new Date(sale.date).toLocaleString('en-GB')}</td>
+            <td class="px-5 py-3 text-xs text-gray-600"><span class="px-1.5 py-0.5 rounded-md bg-surface-100 font-semibold">${sale.cashierName || 'Unknown'}</span></td>
+            <td class="px-5 py-3 text-xs text-gray-700">${sale.customerName || 'Walk-in'}</td>
+            <td class="px-5 py-3 text-xs"><span class="px-2 py-0.5 rounded-md bg-surface-100 text-gray-600 font-semibold text-[10px]">${sale.paymentMethod}</span></td>
+            <td class="px-5 py-3 text-xs text-gray-700 text-right">${sale.itemCount}</td>
+            <td class="px-5 py-3 text-sm font-bold text-gray-900 text-right">${sale.total.toLocaleString()} ${appSettings.currency}</td>
+            <td class="px-5 py-3 text-center">
+              <button onclick="reprintReceipt('${sale.receiptNumber}')" class="text-xs text-primary-600 hover:text-primary-700 font-semibold">Reprint</button>
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      document.getElementById('history-count').textContent = `${filtered.length} transaction${filtered.length !== 1 ? 's' : ''}`;
+      document.getElementById('history-total-sales').textContent = `Total: ${totalSales.toLocaleString()} ${appSettings.currency}`;
+    }
+
+    function reprintReceipt(receiptNumber) {
+      const sale = salesHistory.find(s => s.receiptNumber === receiptNumber);
+      if (!sale) return;
+
+      document.getElementById('receipt-store-name').textContent = appSettings.storeName;
+      document.getElementById('receipt-store-address').textContent = appSettings.storeAddress;
+      document.getElementById('receipt-store-phone').textContent = 'Tel: ' + appSettings.storePhone;
+      document.getElementById("receipt-date").textContent = new Date(sale.date).toLocaleString('en-GB');
+      document.getElementById("receipt-number").textContent = sale.receiptNumber;
+      document.getElementById("receipt-type-label").textContent = "COPY - SALES RECEIPT";
+      document.getElementById("receipt-footer-text").textContent = appSettings.receiptFooter;
+
+      const customerInfo = document.getElementById('receipt-customer-info');
+      if (sale.customerName || sale.customerPhone) {
+        customerInfo.classList.remove('hidden');
+        customerInfo.textContent = `Customer: ${sale.customerName || 'Walk-in'} ${sale.customerPhone ? '| ' + sale.customerPhone : ''}`;
+      } else {
+        customerInfo.classList.add('hidden');
+      }
+
+      const cashierInfo = document.getElementById('receipt-cashier-info');
+      if (sale.cashierName) {
+        cashierInfo.textContent = `Served by: ${sale.cashierName}`;
+      } else {
+        cashierInfo.textContent = '';
+      }
+
+      const receiptBody = document.getElementById("receipt-items-body");
+      receiptBody.innerHTML = "";
+      sale.items.forEach(item => {
+        const cost = item.price * item.quantity;
+        const row = document.createElement("tr");
+        row.className = "border-b border-gray-100";
+        row.innerHTML = `
+          <td class="py-2 pr-2">
+            <div class="font-bold text-gray-900">${item.name}</div>
+            <div class="text-[10px] text-gray-500">${item.price.toLocaleString()} ${appSettings.currency}</div>
+          </td>
+          <td class="py-2 text-center font-bold text-gray-700">${item.quantity}</td>
+          <td class="py-2 text-right text-gray-500">${item.price.toLocaleString()}</td>
+          <td class="py-2 text-right font-bold text-gray-900">${cost.toLocaleString()}</td>
+        `;
+        receiptBody.appendChild(row);
+      });
+
+      document.getElementById("receipt-subtotal").textContent = (sale.subtotal || sale.total).toLocaleString() + " " + appSettings.currency;
+      document.getElementById("receipt-tax-rate").textContent = appSettings.taxRate;
+      document.getElementById("receipt-tax").textContent = (sale.tax || 0).toLocaleString() + " " + appSettings.currency;
+      document.getElementById("receipt-discount").textContent = (sale.discount || 0).toLocaleString() + " " + appSettings.currency;
+      document.getElementById("receipt-item-count").textContent = sale.itemCount + " item(s)";
+      document.getElementById("receipt-payment").textContent = sale.paymentMethod;
+      document.getElementById("receipt-grand-total").textContent = sale.total.toLocaleString() + " " + appSettings.currency;
+      document.getElementById("receipt-paid").textContent = sale.total.toLocaleString() + " " + appSettings.currency;
+      document.getElementById("receipt-change").textContent = "0 " + appSettings.currency;
+
+      document.getElementById("receipt-modal").classList.remove("hidden");
+    }
+
+    function clearSalesHistory() {
+      showConfirmModal('Clear All History?', 'This will permanently delete all sales records.', () => {
+        salesHistory = [];
+        saveSalesHistory();
+        renderSalesHistory();
+        renderDashboard();
+        logActivity('data', 'Sales history cleared');
+        showToast('Sales history cleared', 'info');
+      });
+    }
+
+    // ==================== ACTIVITY LOG ====================
+    function renderActivityLog() {
+      const tbody = document.getElementById('activity-table-body');
+      const userFilter = document.getElementById('activity-user-filter').value;
+      const typeFilter = document.getElementById('activity-type-filter').value;
+      const dateFilter = document.getElementById('activity-date-filter').value;
+
+      // Populate user filter options
+      const userSelect = document.getElementById('activity-user-filter');
+      const currentOptions = Array.from(userSelect.options).map(o => o.value);
+      users.forEach(u => {
+        if (!currentOptions.includes(u.id)) {
+          const opt = document.createElement('option');
+          opt.value = u.id;
+          opt.textContent = u.name;
+          userSelect.appendChild(opt);
+        }
+      });
+
+      let filtered = activityLog.slice().reverse();
+
+      if (userFilter !== 'all') {
+        filtered = filtered.filter(a => a.userId === userFilter);
+      }
+      if (typeFilter !== 'all') {
+        filtered = filtered.filter(a => a.type === typeFilter);
+      }
+      if (dateFilter) {
+        const filterDate = new Date(dateFilter).toDateString();
+        filtered = filtered.filter(a => new Date(a.timestamp).toDateString() === filterDate);
+      }
+
+      tbody.innerHTML = "";
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="py-8 text-center text-sm text-gray-400">No activities found</td></tr>';
+      } else {
+        filtered.forEach(act => {
+          const tr = document.createElement('tr');
+          tr.className = 'activity-row border-b border-surface-100';
+          const colorClass = ACTIVITY_COLORS[act.type] || 'bg-gray-100 text-gray-600';
+          const icon = ACTIVITY_ICONS[act.type] || ACTIVITY_ICONS['info'];
+          tr.innerHTML = `
+            <td class="px-5 py-3 text-xs text-gray-500 whitespace-nowrap">${new Date(act.timestamp).toLocaleString('en-GB')}</td>
+            <td class="px-5 py-3 text-xs">
+              <div class="flex items-center gap-1.5">
+                <span class="w-5 h-5 rounded-full ${users.find(u => u.id === act.userId)?.color || 'bg-gray-400'} flex items-center justify-center text-white text-[9px] font-bold">${(act.userName || 'S').charAt(0).toUpperCase()}</span>
+                <span class="font-semibold text-gray-700">${act.userName || 'System'}</span>
+                <span class="text-[10px] text-gray-400">(${act.userRole || 'System'})</span>
+              </div>
+            </td>
+            <td class="px-5 py-3 text-xs">
+              <span class="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold ${colorClass}">
+                ${icon}
+                <span class="capitalize">${act.type}</span>
+              </span>
+            </td>
+            <td class="px-5 py-3 text-xs text-gray-700">
+              <div class="font-medium">${act.description}</div>
+              ${act.details ? `<div class="text-[10px] text-gray-400 mt-0.5">${act.details}</div>` : ''}
+            </td>
+            <td class="px-5 py-3 text-xs text-right font-semibold text-gray-900 whitespace-nowrap">
+              ${act.value !== null ? act.value.toLocaleString() + ' ' + appSettings.currency : '-'}
+            </td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      document.getElementById('activity-count').textContent = `${filtered.length} activit${filtered.length !== 1 ? 'ies' : 'y'}`;
+      document.getElementById('activity-total-count').textContent = `Total: ${activityLog.length} activities logged`;
+
+      // Render user summary cards
+      renderActivityUserSummary();
+    }
+
+    function renderActivityUserSummary() {
+      const container = document.getElementById('activity-user-summary');
+      const today = new Date().toDateString();
+
+      container.innerHTML = users.map(user => {
+        const userSales = salesHistory.filter(s => s.cashierId === user.id && new Date(s.date).toDateString() === today);
+        const userSalesTotal = userSales.reduce((sum, s) => sum + s.total, 0);
+        const userActivities = activityLog.filter(a => a.userId === user.id && new Date(a.timestamp).toDateString() === today);
+        const userLogins = activityLog.filter(a => a.userId === user.id && a.type === 'login' && new Date(a.timestamp).toDateString() === today).length;
+
+        return `
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-surface-200 card-hover">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="w-10 h-10 ${user.color} rounded-full flex items-center justify-center text-white font-bold text-sm">${user.name.charAt(0).toUpperCase()}</div>
+              <div>
+                <div class="font-bold text-sm text-gray-900">${user.name}</div>
+                <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded-md ${ROLE_COLORS[user.role] || 'bg-gray-100 text-gray-600'}">${user.role}</span>
+              </div>
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-center">
+              <div class="bg-surface-50 rounded-lg p-2">
+                <div class="text-lg font-extrabold text-primary-600">${userSales.length}</div>
+                <div class="text-[10px] text-gray-400 font-medium">Sales</div>
+              </div>
+              <div class="bg-surface-50 rounded-lg p-2">
+                <div class="text-lg font-extrabold text-success-600">${userSalesTotal.toLocaleString()}</div>
+                <div class="text-[10px] text-gray-400 font-medium">Revenue</div>
+              </div>
+              <div class="bg-surface-50 rounded-lg p-2">
+                <div class="text-lg font-extrabold text-warning-600">${userLogins}</div>
+                <div class="text-[10px] text-gray-400 font-medium">Logins</div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function clearActivityLog() {
+      showConfirmModal('Clear Activity Log?', 'All activity records will be permanently deleted.', () => {
+        activityLog = [];
+        saveActivityLog();
+        renderActivityLog();
+        showToast('Activity log cleared', 'info');
+      });
+    }
+
+    function exportActivityCSV() {
+      let csv = 'Timestamp,User,Role,Type,Description,Details,Value,Currency\n';
+      activityLog.forEach(a => {
+        csv += `"${a.timestamp}","${a.userName}","${a.userRole}","${a.type}","${a.description}","${a.details || ''}",${a.value !== null ? a.value : ''},"${appSettings.currency}"
+`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `express_shoppers_activity_${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      logActivity('data', 'Activity log exported to CSV');
+      showToast('Activity log exported', 'success');
+    }
+
+    // ==================== EXPORT / IMPORT ====================
+    function exportInventoryCSV() {
+      let csv = 'ID,Name,Price,Stock,Category,ExpiryDate,IsPerishable,ExpiryStatus\n';
+      inventory.forEach(i => {
+        const expStatus = getExpiryStatus(i.expiryDate).label.replace(/"/g,'');
+        csv += `"${i.id}","${i.name}",${i.price},${i.stock},"${i.category}","${i.expiryDate||''}",${i.isPerishable},"${expStatus}"
+`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `express_shoppers_inventory_${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      logActivity('data', 'Inventory exported to CSV');
+      showToast('Inventory exported to CSV', 'success');
+    }
+
+    function exportSalesCSV() {
+      let csv = 'Receipt,Date,User,Customer,Payment,Items,Subtotal,Tax,Discount,Total\n';
+      salesHistory.forEach(s => {
+        csv += `"${s.receiptNumber}","${s.date}","${s.cashierName || ''}","${s.customerName || ''}","${s.paymentMethod}",${s.itemCount},${s.subtotal || s.total},${s.tax || 0},${s.discount || 0},${s.total}
+`;
+      });
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `express_shoppers_sales_${new Date().toISOString().slice(0,10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      logActivity('data', 'Sales exported to CSV');
+      showToast('Sales exported to CSV', 'success');
+    }
+
+    function backupData() {
+      const data = {
+        inventory,
+        salesHistory,
+        activityLog,
+        users,
+        settings: appSettings,
+        receiptCounter,
+        exportedAt: new Date().toISOString()
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `express_shoppers_backup_${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      logActivity('data', 'Full data backup created');
+      showToast('Backup downloaded', 'success');
+    }
+
+    function restoreData(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (data.inventory) {
+            inventory = data.inventory;
+            saveInventoryToStorage();
+          }
+          if (data.salesHistory) {
+            salesHistory = data.salesHistory;
+            saveSalesHistory();
+          }
+          if (data.activityLog) {
+            activityLog = data.activityLog;
+            saveActivityLog();
+          }
+          if (data.users) {
+            users = data.users;
+            saveUsers();
+          }
+          if (data.settings) {
+            appSettings = data.settings;
+            saveSettings();
+            loadSettings();
+          }
+          if (data.receiptCounter) {
+            receiptCounter = data.receiptCounter;
+            localStorage.setItem('express_shoppers_receipt_counter', receiptCounter);
+          }
+          renderInventoryTable();
+          renderPosProducts();
+          renderCart();
+          renderDashboard();
+          renderSalesHistory();
+          renderActivityLog();
+          renderCategoryPills();
+          renderUserManagement();
+          renderLoginUsers();
+          logActivity('data', 'Data restored from backup file');
+          showToast('Data restored successfully', 'success');
+        } catch (err) {
+          showToast('Invalid backup file', 'error');
+        }
+      };
+      reader.readAsText(file);
+      input.value = '';
+    }
+
+    // ==================== SETTINGS ====================
+    function saveSettings() {
+      appSettings.storeName = document.getElementById('setting-store-name').value.trim() || 'Express Shoppers';
+      appSettings.storeAddress = document.getElementById('setting-store-address').value.trim() || 'Mbarara, Uganda';
+      appSettings.storePhone = document.getElementById('setting-store-phone').value.trim() || '+256 700 000000';
+      appSettings.taxRate = parseFloat(document.getElementById('setting-tax-rate').value) || 0;
+      appSettings.currency = document.getElementById('setting-currency').value.trim() || 'UGX';
+      appSettings.receiptFooter = document.getElementById('setting-receipt-footer').value.trim() || 'Thank you for shopping with us!';
+      saveSettingsStorage();
+      logActivity('settings', 'System settings updated');
+      showToast('Settings saved', 'success');
+    }
+
+    function saveSettingsStorage() {
+      localStorage.setItem('express_shoppers_settings', JSON.stringify(appSettings));
+    }
+
+    // ==================== KEYBOARD SHORTCUTS ====================
+    document.addEventListener('keydown', (e) => {
+      if (!document.getElementById('login-overlay').classList.contains('hidden')) {
+        if (e.key === 'Enter' && !document.getElementById('login-step-pin').classList.contains('hidden')) doLogin();
+        return;
+      }
+
+      if (e.key === 'Escape') {
+        closeReceiptModal();
+        closeConfirmModal();
+        closeEditModal();
+      }
+
+      if (e.key === 'F1') { e.preventDefault(); switchTab('pos-tab'); }
+      if (e.key === 'F2') { e.preventDefault(); switchTab('inventory-tab'); }
+      if (e.key === 'F3') { e.preventDefault(); switchTab('history-tab'); }
+      if (e.key === 'F4') { e.preventDefault(); switchTab('dashboard-tab'); }
+      if (e.key === 'F6') { e.preventDefault(); switchTab('activity-tab'); }
+
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        if (!document.getElementById('pos-tab').classList.contains('hidden')) {
+          processCheckout();
+        }
+      }
+
+      if (e.key === 'F5') {
+        e.preventDefault();
+        logActivity('shortcut', 'Browser refresh command shielded by shortcut supervisor engine');
+    }
+    });
+  </script>
+</body>
+</html>
